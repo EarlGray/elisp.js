@@ -1,0 +1,20 @@
+{
+  "name": "elisp",
+  "version": "0.0.1",
+  "description": "elisp to javascript translator",
+  "main": "index.js",
+  "scripts": {
+    "test": "./node_modules/mocha/bin/mocha"
+  },
+  "repository": "https://github.com/EarlGray/language-incubator/fp/elisp.js",
+  "keywords": [
+    "translator",
+    "elisp"
+  ],
+  "author": "Dmytro Sirenko",
+  "license": "MIT",
+  "dependencies": {
+    "mocha": "^5.2.0",
+    "parsimmon": "^1.10.0"
+  }
+}
