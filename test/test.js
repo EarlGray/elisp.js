@@ -37,7 +37,7 @@ describe('types', () => {
   });
 
   describe('symbol', () => {
-    it("should be foo",     () => assert.equal(foo.to_string(), "foo"));
+    it("should be 'foo",     () => assert.equal(foo.to_string(), "foo"));
   });
 
   describe('cons', () => {
@@ -65,24 +65,24 @@ describe('types', () => {
     it('1 equals 1',          () => assert.ok(integer(1).equals(integer(1))));
     it("'foo equals 'foo",    () => assert.ok(symbol('foo').equals(symbol('foo'))));
     it('[] equals []',        () => assert.ok(vector().equals(vector())));
+    it('"hi" equals "hi"',    () => assert.ok(string('hi').equals(string('hi'))));
     it("'((1 . 2) foo) equals '((1 . 2) foo)", () => {
       let lst1 = cons(cons(integer(1), integer(2)), cons(symbol('foo'), nil)); 
       let lst2 = cons(cons(integer(1), integer(2)), cons(symbol('foo'), nil));
       assert.ok(lst1.equals(lst2));
     });
-    it('"hello" equals "hello"',    () => assert.ok(string('hello').equals(string('hello'))));
   });
 
   /*
    *  sequences
    */
   describe('sequences', () => {
-    it("(arrayp '(1 2 3)) is false", () => assert.ok(!ty.is_array(list1)));
+    it("(arrayp '(1 2 3)) is false",    () => assert.ok(!ty.is_array(list1)));
   });
 
   describe('length', () => {
-    it("(length nil) is 0",       () => assert.equal(nil.seqlen(), 0));
-    it("(length '(1 2 3)) is 3",  () => assert.equal(list1.seqlen(), 3));
+    it("(length nil) is 0",             () => assert.equal(nil.seqlen(), 0));
+    it("(length '(1 2 3)) is 3",        () => assert.equal(list1.seqlen(), 3));
     it("(length [1 2 3 foo bar]) is 5", () => assert.equal(vec1.seqlen(), 5));
   });
 });
@@ -96,10 +96,12 @@ describe('parser', () => {
   let symbol = (s) => new ty.LispSymbol(s);
   let cons = (h, t) => new ty.LispCons(h, t);
   let vector = (arr) => new ty.LispVector(arr);
+  let string = (s) => new ty.LispString(s);
 
   describe('.parseInteger', () => {
     let assertIntp = (input, num) => {
-      assert.equal(parser.parseInteger(input).to_string(), num);
+      let val = parser.parseInteger(input);
+      assert.equal(val.to_string(), num);
     };
 
     it("should parse 0",    () => assertIntp('0', 0));
@@ -118,7 +120,7 @@ describe('parser', () => {
 
     it("should parse ?A",           () => assertCharp('?A', 'A'));
     it("should parse ?a",           () => assertCharp('?a', 'a'));
-    it("should parse ?\\+",          () => assertCharp('?\\+', '+'));
+    it("should parse ?\\+",         () => assertCharp('?\\+', '+'));
 
     it("should parse ?\\a, C-g",    () => assertCharp('?\\a', 7));
     it("should parse ?\\t, <TAB>",  () => assertCharp('?\\t', 9));
@@ -136,10 +138,8 @@ describe('parser', () => {
     it("should parse ?\\C-I",       () => assertCharp('?\\C-I', 9));
     it("should parse ?\\C-ф",       () => assertCharp('?\\C-Ф', (1<<26)+'Ф'.charCodeAt(0)));
 
-    /* TODO:
-    it("should parse ?\\M-A",       () => assertCharp('?\\M-A', 134217793));
-    it("should parse ?\\C-\\M-b",   () => assertCharp('?\\C-\\M-b', 134217730));
-    */
+    xit("should parse ?\\M-A",       () => assertCharp('?\\M-A', 134217793));
+    xit("should parse ?\\C-\\M-b",   () => assertCharp('?\\C-\\M-b', 134217730));
   });
 
   describe('.parseSymbol', () => {
@@ -188,10 +188,11 @@ describe('parser', () => {
     });
     it("should parse code",     () => {
       let args = cons(symbol('x'), nil);
+      let idoc = string("squared argument");
       let body = cons(symbol('*'), cons(symbol('x'), cons(symbol('x'), nil)));
-      let cc = cons(symbol('lambda'), cons(args, cons(body, nil)));
+      let cc = cons(symbol('lambda'), cons(args, cons(idoc, cons(body, nil))));
 
-      let cp = parser.parseList("(lambda (x) (* x x))");
+      let cp = parser.parseList('(lambda (x) "squared argument" (* x x))');
       assert(cp.equals(cc));
     });
   });

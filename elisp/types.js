@@ -26,8 +26,7 @@ LispInteger.prototype = Object.create(LispObject.prototype);
 LispInteger.prototype.to_string = function() { return this.num; };
 
 LispInteger.prototype.equals = function(that) {
-  return that 
-    && (that.prototype == this.prototype)
+  return that && that.prototype == this.prototype
     && this.num === that.num;
 };
 
@@ -43,7 +42,7 @@ LispSymbol.prototype.to_string = function() { return this.sym; };
 Object.defineProperty(LispSymbol.prototype, 'is_symbol', { value: true, writable: false });
 
 LispSymbol.prototype.equals = function(that) {
-  return that && (that.prototype == this.prototype) 
+  return that && that.prototype == this.prototype
     && that.sym === this.sym;
 };
 
@@ -103,7 +102,7 @@ LispCons.prototype.seqlen = function() {
 };
 
 LispCons.prototype.equals = function(that) {
-  return that && (that.prototype === this.prototype)
+  return that && that.prototype === this.prototype
     && that.hd.equals(this.hd) && that.tl.equals(this.tl);
 };
 
@@ -168,8 +167,8 @@ LispVector.prototype.seqlen = function() {
   return this.arr.length;
 };
 LispVector.prototype.equals = function(that) {
-  return that && (that.prototype == this.prototype)
-    && (this.arr.length == that.arr.length)
+  return that && that.prototype == this.prototype
+    && this.arr.length == that.arr.length
     && this.arr.every((v, i) => that.arr[i].equals(v));
 };
 

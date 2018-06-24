@@ -74,7 +74,7 @@ let Lisp = P.createLanguage({
   },
 
   Expression: (r) => {
-    return P.alt(r.Integer, r.Character, r.Symbol, r.List)
+    return P.alt(r.Integer, r.Character, r.String, r.Symbol, r.List)
       .desc("expression");
   },
 
