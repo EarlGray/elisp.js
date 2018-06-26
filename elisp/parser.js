@@ -18,7 +18,14 @@ let uniCharP = P.string('\\u').then(hexdigit.times(4))
 let octCharP = P.string('\\').then(octdigit.times(3))
   .map((os) => parseInt(os.join(''), 8));
 
-let wordstop = P.oneOf(mustEscape).or(P.eof)
+let wordstop = P.oneOf(mustEscape).or(P.eof);
+
+let comment = P.string(';')
+  .then(P.noneOf('\n').many())
+  .then(P.end);
+let gap = P.oneOf(" \t\r\n").or(comment);
+let optWhitespace = gap.many();
+let whitespace = gap.atLeast(1);
 
 /*
  *  Lisp
@@ -88,23 +95,27 @@ let Lisp = P.createLanguage({
       r.String,
       quote,
       r.List,
+      r.Vector,
       r.Integer,
       r.Symbol
-    ).desc("expression");
+    )
+    .desc("expression");
   },
 
   List: (r) => {
-    let open = P.string('(').then(P.optWhitespace);
-    let close = P.optWhitespace.then(P.string(')'));
-    return r.Expression.sepBy(P.whitespace)
+    let open = P.string('(').then(optWhitespace);
+    let close = optWhitespace.then(P.string(')'));
+    return r.Expression.sepBy(whitespace)
       .wrap(open, close)
       .map(ty.list)
       .desc("list/pair");
   },
 
   Vector: (r) => {
-    return r.Expression.sepBy(P.whitespace)
-      .wrap(P.string('['), P.string(']'))
+    let open = P.string('[').then(optWhitespace);
+    let close = optWhitespace.then(P.string(']'));
+    return r.Expression.sepBy(whitespace)
+      .wrap(open, close)
       .map(ty.vector)
       .desc("vector");
   }
@@ -120,3 +131,5 @@ exports.parseString = mkParser(Lisp.String);
 exports.parseExpr = mkParser(Lisp.Expression);
 exports.parseList = mkParser(Lisp.List);
 exports.parseVector = mkParser(Lisp.Vector);
+
+exports.read = (input) => Lisp.Expression.tryParse(input.trim());

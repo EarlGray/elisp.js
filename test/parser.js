@@ -139,17 +139,55 @@ describe('parser', () => {
 
   describe('.parseVector', () => {
     let assertVec = (input, arr) => {
-      let vp = parser.parseVector(input);
+      let vp = parse(input);
       let vc = ty.vector(arr);
       assert.ok(vp.equals(vc));
     };
 
     it("should parse []",       () => assertVec('[]', []));
-    it("should parse [one 1]",  
-        () => assertVec('[one 1]', [ty.symbol('one'), ty.integer(1)]));
+    it("should parse [foo 1]",
+        () => assertVec('[foo 1]', [foo, one]));
+    it("should parse [ foo 1]",
+        () => assertVec('[ foo 1]', [foo, one]));
   });
 
   describe('.parseExpr', () => {
     it("should parse nil as nil", () => assertEquals(parse("nil"), nil));
+  });
+
+  xdescribe('comment', () => {
+    it("should trim _whitespace", () => assertEquals(parser.read(' foo'), foo));
+    it("should trim whitespace_", () => assertEquals(parser.read('foo '), foo));
+    it("should trim _whitespace_", () => assertEquals(parser.read(' foo '), foo));
+    it("should trim comments", () => {
+      let lp = parser.read("wtf  ;; whiskey tango foxtrot");
+      assertEquals(lp, ty.symbol('wtf'));
+    });
+    it("should trim empty comments", () => {
+      let input = `;
+      foo`;
+      assertEquals(parser.read(input), foo);
+    });
+    it("should trim comments before", () => {
+      let input = `;; start
+      foo`;
+      assertEquals(parser.read(input), foo);
+    });
+    it("should trim comments inside lists", () => {
+      let input = `(1 ;; comment
+      2)`;
+      assertEquals(parser.read(input), list1);
+    });
+    it("should trim many comments", () => {
+      let input = `
+      ;; THE SOFTWARE IS PROVIDED "AS IS",
+       ;; WITHOUT WARRANTY OF ANY KIND, EXRESSED OR IMPLIED
+      foo`;
+      assertEquals(parser.read(input), foo);
+    });
+    it("should respect strings", () => {
+      let input = `("1;" 2)`;
+      assertEquals(parser.read(input), ty.list([ty.string('1;'), two]));
+    });
   });
 });
