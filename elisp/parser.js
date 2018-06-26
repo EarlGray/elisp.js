@@ -6,7 +6,7 @@ let P = require('parsimmon');
 /*
  * Utils
  */
-let mustEscape = "#;()[] \t\n\r\\\"'?";
+let mustEscape = "#;()[] \t\n\r\\\"'`,?";
 
 let hexdigit = P.regex(/[0-9A-Fa-f]/);
 let octdigit = P.regex(/[0-7]/);
@@ -78,8 +78,9 @@ let Lisp = P.createLanguage({
   },
 
   Expression: (r) => {
-    let quote = P.string("'").then(r.Expression)
-      .map((obj) => ty.list([ty.symbol('quote'), obj]))
+    let quotemap = {"'": "quote", "`": "`", ",":","};
+    let quote = P.seq(P.oneOf("'`,"), r.Expression)
+      .map((e) => ty.list([ty.symbol(quotemap[e[0]]), e[1]]))
       .desc("quoted expression");
     // fast backtracking first:
     return P.alt(
@@ -110,7 +111,7 @@ let Lisp = P.createLanguage({
 });
 
 
-let mkParser = (p) => { return (input) => { return p.tryParse(input); }; };
+let mkParser = (p) => (input) => p.tryParse(input);
 
 exports.parseInteger = mkParser(Lisp.Integer);
 exports.parseCharacter = mkParser(Lisp.Character);

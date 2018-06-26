@@ -84,9 +84,8 @@ describe('parser', () => {
 
   describe('.parseString', () => {
     let assertStr = (input, str) => {
-      str = str || input;
       let val = parser.parseString(input);
-      assert.equal(val.to_string(), str);
+      assert.equal(val.to_string(), str || input);
     };
 
     it('should parse ""',             () => assertStr('""'));
@@ -106,6 +105,13 @@ describe('parser', () => {
         () => assertEquals(parse("'foo"), ty.list([quote, foo])));
     it("should parse double quote",
         () => assertEquals(parse("''foo"), ty.list([quote, ty.list([quote, foo])])));
+    it("should parse quasiquote", () => {
+      let lp = parse("`((+ 2 2) is ,(+ 2 2))");
+      let l2p2 = ty.list([ty.symbol('+'), two, two]);
+      let lc1 = ty.list([l2p2, ty.symbol('is'), ty.list([ty.symbol(','), l2p2])]);
+      let lc = ty.list([ty.symbol('`'), lc1]);
+      assertEquals(lp, lc);
+    });
   });
 
   describe('.parseList', () => {
@@ -120,7 +126,7 @@ describe('parser', () => {
       let lp = parser.parseList("( 1  2 )");
       assert(lp.equals(list1));
     });
-    it("should parse code",     () => {
+    it("should parse code", () => {
       let args = ty.list([ty.symbol('x')]);
       let idoc = ty.string("squared argument");
       let body = ty.list([ty.symbol('*'), ty.symbol('x'), ty.symbol('x')]);
