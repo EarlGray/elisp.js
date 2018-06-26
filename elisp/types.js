@@ -24,9 +24,10 @@ function LispInteger(num) {
 LispInteger.prototype = Object.create(LispObject.prototype);
 
 LispInteger.prototype.to_string = function() { return this.num; };
+LispInteger.prototype.to_js = function() { return this.num; };
 
 LispInteger.prototype.equals = function(that) {
-  return that && that.prototype == this.prototype
+  return that && that.__proto__ == this.__proto__
     && this.num === that.num;
 };
 
@@ -39,10 +40,11 @@ function LispSymbol(sym) {
 LispSymbol.prototype = Object.create(LispSymbol.prototype);
 
 LispSymbol.prototype.to_string = function() { return this.sym; };
+LispSymbol.prototype.to_js = function() { return Symbol(this.sym); };
 Object.defineProperty(LispSymbol.prototype, 'is_symbol', { value: true, writable: false });
 
 LispSymbol.prototype.equals = function(that) {
-  return that && that.prototype == this.prototype
+  return that && that.__proto__ == this.__proto__
     && that.sym === this.sym;
 };
 
@@ -50,15 +52,28 @@ LispSymbol.prototype.equals = function(that) {
  *  LispCons, LispNil
  */
 
-var LispNil = {};
-LispNil.prototype = Object.create(LispObject.prototype);
-LispNil.to_string = () => "nil";
-LispNil.equals = (that) => that === LispNil;
-LispNil.seqlen = () => 0;
+function NilClass() {};
+NilClass.prototype = Object.create(LispObject.prototype);
 
-Object.defineProperty(LispNil, 'is_list', { value: true, writable: false });
-Object.defineProperty(LispNil, 'is_false', { value: true, writable: false });
-Object.defineProperty(LispNil, 'is_seq', { value: true, writable: false });
+NilClass.prototype.toString = function() { return "[Object LispNil]"; };
+
+NilClass.prototype.to_string = () => "nil";
+NilClass.prototype.to_js = () => LispNil;
+
+// you can be everything you want to be:
+Object.defineProperty(NilClass.prototype, 'is_symbol', { value: true, writable: false });
+
+// ...even a sequence!
+NilClass.prototype.seqlen = () => 0;
+Object.defineProperty(NilClass.prototype, 'is_seq', { value: true, writable: false });
+Object.defineProperty(NilClass.prototype, 'is_list', { value: true, writable: false });
+
+// ...even a nobody!
+Object.defineProperty(NilClass.prototype, 'is_false', { value: true, writable: false });
+
+const LispNil = new NilClass();
+NilClass.prototype.equals = (that) => that == LispNil;
+
 
 
 function LispCons(hd, tl) {
@@ -74,7 +89,7 @@ Object.defineProperty(LispCons.prototype,
   'is_seq', { value: true, writable: false }
 );
 
-LispCons.prototype.to_string = function() {
+LispCons.prototype.show_elems = function() {
   let elems = [];
   let cur = this;
   while (cur != LispNil) {
@@ -86,7 +101,14 @@ LispCons.prototype.to_string = function() {
     }
     cur = cur.tl;
   };
-  return '(' + elems.join(' ') + ')';
+  return elems;
+};
+
+LispCons.prototype.to_string = function() {
+  return '(' + this.show_elems().join(' ') + ')';
+};
+LispCons.prototype.to_js = function() {
+  return '[' + this.show_elems().join(', ') + ']';
 };
 
 LispCons.prototype.seqlen = function() {
@@ -102,8 +124,17 @@ LispCons.prototype.seqlen = function() {
 };
 
 LispCons.prototype.equals = function(that) {
-  return that && that.prototype === this.prototype
+  return that && that.__proto__ === this.__proto__
     && that.hd.equals(this.hd) && that.tl.equals(this.tl);
+};
+
+let consify = (elems) => {
+  let cur = LispNil;
+  while (elems.length) {
+    let elem = elems.pop();
+    cur = new LispCons(elem, cur);
+  }
+  return cur;
 };
 
 /*
@@ -124,12 +155,14 @@ LispString.prototype.to_string = function() {
   return '"' + str + '"';
 };
 
+LispString.prototype.to_js = function() { return this.to_string(); };
+
 LispString.prototype.seqlen = function() {
   return this.str.length;
 };
 
 LispString.prototype.equals = function(that) {
-  return that && that.prototype == this.prototype
+  return that && that.__proto__ == this.__proto__
     && that.str === this.str;
 };
 
@@ -147,6 +180,8 @@ LispHashtable.prototype.to_string = function() {
   return "#s(<TODO>)";
 };
 
+LispHashtable.prototype.to_js = () => this.hash;
+
 
 /*
  *  vectors
@@ -163,11 +198,12 @@ Object.defineProperty(LispVector.prototype,
 LispVector.prototype.to_string = function() {
   return '[' + this.arr.map(obj => obj.to_string()).join(' ') + ']';
 };
+LispVector.prototype.to_js = function() { return this.arr; };
 LispVector.prototype.seqlen = function() {
   return this.arr.length;
 };
 LispVector.prototype.equals = function(that) {
-  return that && that.prototype == this.prototype
+  return that && that.__proto__ == this.__proto__
     && this.arr.length == that.arr.length
     && this.arr.every((v, i) => that.arr[i].equals(v));
 };
@@ -200,6 +236,16 @@ exports.is_list = (obj) => obj.is_list;
 exports.is_sequence = (obj) => obj.is_seq;
 exports.is_array = (obj) => obj.is_array;
 
-exports.is_string = (obj) => obj.prototype == LispString.prototype;
-exports.is_symbol = (obj) => obj.prototype == LispSymbol.prototype;
-exports.is_vector = (obj) => obj.prototype == LispVector.prototype;
+// Elisp->JS mapping is one-to-one:
+exports.is_string = (obj) => obj.__proto__ == LispString.prototype;
+exports.is_vector = (obj) => obj.__proto__ == LispVector.prototype;
+// many JS object types may be a symbol:
+exports.is_symbol = (obj) => obj.is_symbol;
+
+exports.nil     = LispNil;
+exports.integer = (n) => new LispInteger(n);
+exports.symbol  = (s) => new LispSymbol(s);
+exports.cons    = (h, t) => new LispCons(h, t);
+exports.list    = (arr) => consify(arr);
+exports.vector  = (arr) => new LispVector(arr);
+exports.string  = (s) => new LispString(s);

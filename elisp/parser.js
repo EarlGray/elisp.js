@@ -18,6 +18,7 @@ let uniCharP = P.string('\\u').then(hexdigit.times(4))
 let octCharP = P.string('\\').then(octdigit.times(3))
   .map((os) => parseInt(os.join(''), 8));
 
+let wordstop = P.oneOf(mustEscape).or(P.eof)
 
 /*
  *  Lisp
@@ -25,14 +26,14 @@ let octCharP = P.string('\\').then(octdigit.times(3))
 let Lisp = P.createLanguage({
   Integer: () => {
     return P.regexp(/[+-]?[0-9]+/)
-      .lookahead(P.oneOf(mustEscape).or(P.eof))     // otherwise it's a symbol
-      .map((x) => new ty.LispInteger(parseInt(x)))
+      .lookahead(wordstop)     // otherwise it's a symbol
+      .map((x) => ty.integer(parseInt(x)))
       .desc("number");
   },
 
   Character: () => {
     const escs = {
-      a: 7, b: 8, t: 9, n: 10, v: 11, f: 12, 
+      a: 7, b: 8, t: 9, n: 10, v: 11, f: 12,
       r: 13, e: 27, s: 32, '\\': 92, d: 127
     };
     let escsKeys = Object.keys(escs).join('');
@@ -49,7 +50,7 @@ let Lisp = P.createLanguage({
 
     return P.string('?')
       .then(P.alt(uniCharP, octCharP, ctrlCharP, escCharP, justCharP))
-      .map((code) => new ty.LispInteger(code))
+      .map(ty.integer)
       .desc('character')
   },
 
@@ -62,42 +63,48 @@ let Lisp = P.createLanguage({
 
     return P.alt(unichar, octchar, ignored, escapes, P.noneOf('"'))
       .many().wrap(dquote, dquote)
-      .map((cs) => new ty.LispString(cs.join('')))
+      .map((cs) => ty.string(cs.join('')))
       .desc("string");
   },
 
   Symbol: (r) => {
+    let nilp = P.string('nil').lookahead(wordstop).result(ty.nil);
+
     let charp = P.noneOf(mustEscape).or(P.string('\\').then(P.any));
-    return charp.atLeast(1)
-      .map((atom) => new ty.LispSymbol(atom.join('')))
+    let symp = charp.atLeast(1)
+      .map((atom) => ty.symbol(atom.join('')));
+    return nilp.or(symp)
       .desc("symbol");
   },
 
   Expression: (r) => {
-    return P.alt(r.Integer, r.Character, r.String, r.Symbol, r.List)
-      .desc("expression");
+    let quote = P.string("'").then(r.Expression)
+      .map((obj) => ty.list([ty.symbol('quote'), obj]))
+      .desc("quoted expression");
+    // fast backtracking first:
+    return P.alt(
+      r.Character,
+      r.String,
+      quote,
+      r.List,
+      r.Integer,
+      r.Symbol
+    ).desc("expression");
   },
 
   List: (r) => {
-    let consify = (elems) => {
-      let cur = ty.LispNil;
-      while (elems.length) {
-        let elem = elems.pop();
-        cur = new ty.LispCons(elem, cur);
-      }
-      return cur;
-    };
-
+    let open = P.string('(').then(P.optWhitespace);
+    let close = P.optWhitespace.then(P.string(')'));
     return r.Expression.sepBy(P.whitespace)
-      .wrap(P.string('('), P.string(')'))
-      .map((elems) => elems.length == 0 ? ty.LispNil : consify(elems))
+      .wrap(open, close)
+      .map(ty.list)
       .desc("list/pair");
   },
 
   Vector: (r) => {
     return r.Expression.sepBy(P.whitespace)
       .wrap(P.string('['), P.string(']'))
-      .map((elems) => new ty.LispVector(elems))
+      .map(ty.vector)
       .desc("vector");
   }
 });

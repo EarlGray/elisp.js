@@ -3,30 +3,31 @@ const assert = require('assert');
 describe('types', () => {
   let ty = require('elisp/types.js');
 
-  let nil = ty.LispNil;
-  let integer = (n) => new ty.LispInteger(n);
-  let symbol = (s) => new ty.LispSymbol(s);
-  let cons = (h, t) => new ty.LispCons(h, t);
-  let vector = (arr) => new ty.LispVector(arr);
-  let string = (s) => new ty.LispString(s);
+  let cons = ty.cons;
+  let nil = ty.nil;
 
-  let zero = integer(0);
-  let one = integer(1);
-  let two = integer(2);
-  let three = integer(3);
+  let zero = ty.integer(0);
+  let one = ty.integer(1);
+  let two = ty.integer(2);
+  let three = ty.integer(3);
 
-  let foo = symbol('foo');
-  let bar = symbol('bar');
+  let foo = ty.symbol('foo');
+  let bar = ty.symbol('bar');
 
   let c1 = cons(foo, one);
   let c2 = cons(bar, two);
   let list1 = cons(one, cons(two, cons(three, nil)));
 
-  let vec0 = new ty.LispVector();
-  let vec1 = vector([one, two, three, foo, bar]);
- 
+  let vec0 = ty.vector();
+  let vec1 = ty.vector([one, two, three, foo, bar]);
+
   describe('integer', () => {
     it("should be an atom", () => assert.ok(ty.is_atom(zero)));
+  });
+
+  describe('symbol', () => {
+    it("should be 'foo",     () => assert.equal(foo.to_string(), "foo"));
+    it("nil should be symbol",  () => assert.ok(ty.is_symbol(nil)));
   });
 
   describe('nil', () => {
@@ -36,19 +37,20 @@ describe('types', () => {
     it("should be an atom", () => assert.ok(ty.is_atom(nil)));
   });
 
-  describe('symbol', () => {
-    it("should be 'foo",     () => assert.equal(foo.to_string(), "foo"));
-  });
-
   describe('cons', () => {
     it("should be a list",      () => assert.ok(c1.is_list));
     it("should not be an atom", () => assert.ok(!ty.is_atom(list1)));
 
-    it("should print (foo . 1)", 
+    it("should print (foo . 1)",
        () => assert.equal(cons(foo, one).to_string(), "(foo . 1)"));
     it("should print (1 2 3)",  () => assert.equal(list1.to_string(), "(1 2 3)"));
     it("should print ((foo . 1) . (bar . 2))",
        () => assert.equal(cons(c1, c2).to_string(), "((foo . 1) bar . 2)"));
+
+    it("consify",           () => {
+      let lst123 = ty.list([ty.integer(1), ty.integer(2), ty.integer(3)]);
+      assert.ok(lst123.equals(list1));
+    });
   });
 
   describe('vector', () => {
@@ -57,18 +59,28 @@ describe('types', () => {
        () => assert.equal(vec1.to_string(), '[1 2 3 foo bar]'));
   });
 
+  describe('string', () => {
+    it("should be string",      () => assert.ok(ty.is_string(ty.string("hello"))));
+  });
+
 
   /*
    *  equality
    */
   describe('equality', () => {
-    it('1 equals 1',          () => assert.ok(integer(1).equals(integer(1))));
-    it("'foo equals 'foo",    () => assert.ok(symbol('foo').equals(symbol('foo'))));
-    it('[] equals []',        () => assert.ok(vector().equals(vector())));
-    it('"hi" equals "hi"',    () => assert.ok(string('hi').equals(string('hi'))));
-    it("'((1 . 2) foo) equals '((1 . 2) foo)", () => {
-      let lst1 = cons(cons(integer(1), integer(2)), cons(symbol('foo'), nil)); 
-      let lst2 = cons(cons(integer(1), integer(2)), cons(symbol('foo'), nil));
+    let assertEq = (lhs, rhs) => assert.ok( lhs.equals(rhs) );
+
+    it('1 equals 1',          () => assertEq(ty.integer(1), ty.integer(1)));
+    it("'foo equals 'foo",    () => assertEq(ty.symbol('foo'), ty.symbol('foo')));
+    it('"hi" equals "hi"',    () => assertEq(ty.string('hi'), ty.string('hi')));
+    it('[] equals []',        () => assertEq(ty.vector(), ty.vector()));
+    it("'((1 . 2) foo) equals '((1 . 2) foo)", () => assertEq(
+        cons(cons(ty.integer(1), ty.integer(2)), cons(ty.symbol('foo'), nil)),
+        cons(cons(ty.integer(1), ty.integer(2)), cons(ty.symbol('foo'), nil)))
+    );
+    it("ty.list([1, 2, foo]) equals (1 2 foo)", () => {
+      let lst1 = ty.list([ty.integer(1), ty.integer(2), ty.symbol('foo')]);
+      let lst2 = cons(ty.integer(1), cons(ty.integer(2), cons(ty.symbol('foo'), nil)));
       assert.ok(lst1.equals(lst2));
     });
   });
@@ -91,12 +103,21 @@ describe('parser', () => {
   let ty = require('elisp/types.js');
   let parser = require('elisp/parser.js');
 
-  let nil = ty.LispNil;
-  let integer = (n) => new ty.LispInteger(n);
-  let symbol = (s) => new ty.LispSymbol(s);
-  let cons = (h, t) => new ty.LispCons(h, t);
-  let vector = (arr) => new ty.LispVector(arr);
-  let string = (s) => new ty.LispString(s);
+  let nil = ty.nil;
+  let cons = ty.cons;
+
+  let quote = ty.symbol('quote');
+  let foo = ty.symbol('foo');
+
+  let one = ty.integer(1);
+  let two = ty.integer(2);
+  let list1 = cons(one, cons(two, nil));
+
+  let parse = parser.parseExpr;
+  let assertEquals = (lhs, rhs) => {
+    if (!lhs.equals(rhs))
+      assert.equal(lhs.to_js(), rhs.to_js());
+  };
 
   describe('.parseInteger', () => {
     let assertIntp = (input, num) => {
@@ -178,19 +199,30 @@ describe('parser', () => {
     xit('should render "\\C-a" as "^A"',  () => assertStr('"\\C-a"', "^A"));
   });
 
+  describe('.parseQuote', () => {
+    it("should parse quote",
+        () => assertEquals(parse("'foo"), ty.list([quote, foo])));
+    it("should parse double quote",
+        () => assertEquals(parse("''foo"), ty.list([quote, ty.list([quote, foo])])));
+  });
+
   describe('.parseList', () => {
     it("should parse () as nil",
         () => assert.equal(parser.parseList("()"), nil));
+
     it("should parse (1 2)", () => {
       let lp = parser.parseList("(1 2)");
-      let lc = cons(integer(1), cons(integer(2), nil));
-      assert(lp.equals(lc));
+      assert(lp.equals(list1));
+    });
+    it("should handle optional whitespace", () => {
+      let lp = parser.parseList("( 1  2 )");
+      assert(lp.equals(list1));
     });
     it("should parse code",     () => {
-      let args = cons(symbol('x'), nil);
-      let idoc = string("squared argument");
-      let body = cons(symbol('*'), cons(symbol('x'), cons(symbol('x'), nil)));
-      let cc = cons(symbol('lambda'), cons(args, cons(idoc, cons(body, nil))));
+      let args = cons(ty.symbol('x'), nil);
+      let idoc = ty.string("squared argument");
+      let body = cons(ty.symbol('*'), ty.cons(ty.symbol('x'), cons(ty.symbol('x'), nil)));
+      let cc = cons(ty.symbol('lambda'), cons(args, cons(idoc, cons(body, nil))));
 
       let cp = parser.parseList('(lambda (x) "squared argument" (* x x))');
       assert(cp.equals(cc));
@@ -200,11 +232,15 @@ describe('parser', () => {
   describe('.parseVector', () => {
     let assertVec = (input, arr) => {
       let vp = parser.parseVector(input);
-      let vc = vector(arr);
+      let vc = ty.vector(arr);
       assert.ok(vp.equals(vc));
     };
 
     it("should parse []",       () => assertVec('[]', []));
-    it("should parse [one 1]",  () => assertVec('[one 1]', [symbol('one'), integer(1)]));
+    it("should parse [one 1]",  () => assertVec('[one 1]', [ty.symbol('one'), ty.integer(1)]));
+  });
+
+  describe('.parseExpr', () => {
+    it("should parse nil as nil", () => assertEquals(parse("nil"), nil));
   });
 });
