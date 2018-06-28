@@ -2,6 +2,18 @@
 
 const assert = require('assert');
 
+function from_js(val) {
+  if (val instanceof LispObject)
+    return val;
+  switch (typeof val) {
+    case 'number': return new LispInteger(val);
+    case 'string': return new LispString(val);
+    case 'symbol': return new LispSymbol(val.toString().slice(7, -1));
+    default: throw new Error('Failed to lispify: ' + val.toString());
+  }
+}
+
+
 /*
  *  LispObject
  */
@@ -25,6 +37,7 @@ LispInteger.prototype = Object.create(LispObject.prototype);
 
 LispInteger.prototype.to_string = function() { return this.num; };
 LispInteger.prototype.to_js = function() { return this.num; };
+LispInteger.prototype.to_jsstring = function() { return '' + this.num; };
 
 LispInteger.prototype.equals = function(that) {
   return that && that.__proto__ == this.__proto__
@@ -37,15 +50,21 @@ LispInteger.prototype.equals = function(that) {
 function LispSymbol(sym) {
   this.sym = sym;
 };
-LispSymbol.prototype = Object.create(LispSymbol.prototype);
+LispSymbol.prototype = Object.create(LispObject.prototype);
 
 LispSymbol.prototype.to_string = function() { return this.sym; };
 LispSymbol.prototype.to_js = function() { return Symbol(this.sym); };
+LispSymbol.prototype.to_jsstring = function() { return "ty.symbol('" + this.sym + "')" };
+
 Object.defineProperty(LispSymbol.prototype, 'is_symbol', { value: true, writable: false });
 
 LispSymbol.prototype.equals = function(that) {
   return that && that.__proto__ == this.__proto__
     && that.sym === this.sym;
+};
+
+LispSymbol.prototype.is_selfevaluating = function() {
+  return this.sym === 't' || this.sym.startsWith(':');
 };
 
 /*
@@ -59,6 +78,7 @@ NilClass.prototype.toString = function() { return "[Object LispNil]"; };
 
 NilClass.prototype.to_string = () => "nil";
 NilClass.prototype.to_js = () => LispNil;
+NilClass.prototype.to_jsstring = () => "ty.nil";
 
 // you can be everything you want to be:
 Object.defineProperty(NilClass.prototype, 'is_symbol', { value: true, writable: false });
@@ -89,6 +109,16 @@ Object.defineProperty(LispCons.prototype,
   'is_seq', { value: true, writable: false }
 );
 
+LispCons.prototype.forEach = function(callback) {
+  let cur = this;
+  while (cur != LispNil) {
+    callback(cur.hd);
+    if (!cur.tl.is_list)
+      throw new Error('LispCons.forEach: not a regular list');
+    cur = cur.tl;
+  }
+};
+
 LispCons.prototype.show_elems = function() {
   let elems = [];
   let cur = this;
@@ -110,16 +140,19 @@ LispCons.prototype.to_string = function() {
 LispCons.prototype.to_js = function() {
   return '[' + this.show_elems().join(', ') + ']';
 };
+LispCons.prototype.to_jsstring = function() {
+  let elems = [];
+  this.forEach((item) => {
+    let repr = item.to_jsstring();
+    elems.push(repr);
+  });
+  return "ty.list([" + elems.join(', ') + '])';
+};
 
 LispCons.prototype.seqlen = function() {
   let cur = this;
   let len = 0;
-  while (cur != LispNil) {
-    ++len;
-    if (!cur.tl.is_list)
-      break;
-    cur = cur.tl;
-  }
+  this.forEach(() => ++len);
   return len;
 };
 
@@ -135,6 +168,12 @@ let consify = (elems) => {
     cur = new LispCons(elem, cur);
   }
   return cur;
+};
+
+LispCons.prototype.to_array = function() {
+  let val = [];
+  this.forEach((item) => val.push(item));
+  return val;
 };
 
 /*
@@ -156,6 +195,7 @@ LispString.prototype.to_string = function() {
 };
 
 LispString.prototype.to_js = function() { return this.to_string(); };
+LispString.prototype.to_jsstring = function() { return this.to_string(); };
 
 LispString.prototype.seqlen = function() {
   return this.str.length;
@@ -199,6 +239,9 @@ LispVector.prototype.to_string = function() {
   return '[' + this.arr.map(obj => obj.to_string()).join(' ') + ']';
 };
 LispVector.prototype.to_js = function() { return this.arr; };
+LispVector.prototype.to_jsstring = function() {
+  return 'ty.vector([' + this.arr.map((it) => it.to_jsstring()).join(', ') + '])';
+};
 LispVector.prototype.seqlen = function() {
   return this.arr.length;
 };
@@ -220,6 +263,42 @@ LispChartable.prototype = Object.create(LispObject.prototype);
 function LispBoolvector() { };
 LispBoolvector.prototype = Object.create(LispObject.prototype);
 
+
+/*
+ *  lambda
+ */
+function LispLambda() {
+};
+LispLambda.prototype = Object.create(LispObject.prototype);
+
+/*
+ *  native subroutine
+ */
+function LispSubr(name, args, func, doc) {
+  this.name = name;
+  this.args = args;
+  this.func = func;
+  this.doc = doc;
+};
+
+LispSubr.prototype = Object.create(LispObject.prototype);
+
+Object.defineProperty(LispSubr.prototype,
+  'is_subr', { value: true, writable: false }
+);
+
+LispSubr.prototype.to_string = function() { return "#<subr " + this.name + ">"; }
+LispSubr.prototype.to_js = function() { return this.func; }
+LispSubr.prototype.to_jsstring = function () { return "subr.all['" + this.name + "']"; };
+
+LispSubr.prototype.fcall = function() {
+  // console.error('### fcall(' + Array.prototype.join.call(arguments, ', ') + ')');
+  let func = this.func;
+  let args = Array.prototype.map.call(arguments, from_js);
+  let result = func.apply(func, args);
+  return result;
+};
+
 /*
  *  exports
  */
@@ -230,6 +309,7 @@ exports.LispCons = LispCons;
 exports.LispSymbol = LispSymbol;
 exports.LispString = LispString;
 exports.LispVector = LispVector;
+exports.LispSubr = LispSubr;
 
 exports.is_atom = (obj) => (obj == LispNil) || !obj.is_list;
 exports.is_list = (obj) => obj.is_list;
@@ -249,3 +329,5 @@ exports.cons    = (h, t) => new LispCons(h, t);
 exports.list    = (arr) => consify(arr);
 exports.vector  = (arr) => new LispVector(arr);
 exports.string  = (s) => new LispString(s);
+
+exports.from_js = from_js;

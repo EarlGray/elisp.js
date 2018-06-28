@@ -1,12 +1,16 @@
 const readline = require('readline');
 const process = require('process');
 
+const ty = require('elisp/types');
 const parser = require('elisp/parser');
-var translate = require('elisp/translator').translate;
+let translate = require('elisp/translator').translate;
 
-/*
- *  Arguments
- */
+const Environment = require('elisp/environment').Environment;
+var env = new Environment();
+
+const elisp = require('elisp/elisp');
+
+
 let replRawParser = (line) => parser.parseExpr(line);
 let replParser = (line) => parser.parseExpr(line).to_string();
 let replTranslator = (line) => {
@@ -14,12 +18,11 @@ let replTranslator = (line) => {
   let jscode = translate(expr);
   return jscode;
 };
-let replEvaluator = (line) => {
-  let expr = parser.parseExpr(line);
-  let jscode = translate(expr);
-  let result = eval(jscode);
-  return result;
-};
+let replEvaluator = (line) => elisp.eval_text(line, env);
+
+/*
+ *  Arguments
+ */
 
 /* default action */
 var loop = replEvaluator;
@@ -58,7 +61,7 @@ rl.on('line', (line) => {
   try {
     console.log(loop(line));
   } catch (e) {
-    console.error('Syntax ' + e);
+    console.error(e.stack);
   };
 
   rl.prompt();
