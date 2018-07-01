@@ -15,10 +15,23 @@ describe('translator', () => {
     it("translates strings",    () => assert.equal(translate(ty.string("hello")), '"hello"'));
     it("translates numbers",    () => assert.equal(translate(ty.integer(42)), "42"));
     it("translates nil",        () => assert.equal(translate(ty.nil), "ty.nil"));
-    it("translates symbols",    () => assert.equal(translate(ty.symbol("foo")), "env.get('foo')"));
+    it("translates symbols",
+        () => assert.equal(translate(ty.symbol("foo")), "global.env.get('foo')"));
+    it("translates keyword symbols",
+        () => assert.equal(translate(ty.symbol(":bar")), "ty.symbol(':bar')"));
   });
 });
 
+describe('environment', () => {
+  describe('constant symbols', () => {
+    it("cannot set nil",
+        () => assert.throws(() => elisp.eval_text('(setq nil t)'), Error));
+    it("cannot set t",
+        () => assert.throws(() => elisp.eval_text('(setq t nil)'), Error));
+    it("cannot set keywords",
+        () => assert.throws(() => elisp.eval_text('(setq :nope :yes)'), Error));
+  });
+});
 
 describe('special forms', () => {
   let env = new Environment();

@@ -3,9 +3,14 @@
 const ty = require('elisp/types');
 const subr = require('elisp/subr');
 
-function Environment() {
+function Environment(name) {
   this.fs = {};
   this.vs = {};
+  this.name = name || 'env';
+}
+
+Environment.prototype.to_jsstring = function() {
+  return 'global.' + this.name;
 }
 
 Environment.prototype.set = function() {

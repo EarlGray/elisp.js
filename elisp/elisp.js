@@ -6,9 +6,18 @@ const translator = require('elisp/translator');
 const Environment = require('elisp/environment').Environment;
 
 function eval_lisp(expr, env) {
-  env = env || new Environment();
+  env = env || new Environment('env');
   let jscode = translator.translate(expr, env);
-  let result = eval(jscode);
+
+  let result;
+  let saved_env = global[env.name];
+  try {
+    global[env.name] = env;
+    result = eval(jscode);
+  } finally {
+    global[env.name] = saved_env;
+  }
+
   return ty.from_js(result);
 }
 

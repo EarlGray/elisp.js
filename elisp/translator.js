@@ -1,8 +1,7 @@
 'use strict';
 
 const ty = require('elisp/types');
-const env = require('elisp/environment');
-const Environment = env.Environment;
+const Environment = require('elisp/environment').Environment;
 
 let specials = {
   'quote': function(args) {
@@ -37,11 +36,13 @@ let specials = {
       let value = args[i+1];
       if (!ty.is_symbol(name))
         throw new Error('Wrong type argument: symbolp, ' + name.to_string());
+      if (name.is_selfevaluating())
+        throw new Error('Attempt to set a constant symbol: ' + ty.to_string());
       pairs.push("'" + name.to_string() + "'");
       pairs.push(translate_top(value, env));
       i += 2;
     }
-    return "env.set(" + pairs.join(", ") + ")";
+    return env.to_jsstring() + ".set(" + pairs.join(", ") + ")";
   },
 
   'progn': function(args, env) {
@@ -59,9 +60,6 @@ let specials = {
     return '(() => { ' + stmts.join(';\n') + '})()';
   },
 };
-
-let translate_expr = (input, env) => {
-}
 
 let translate_top = (input, env) => {
   if (input.is_false) {
@@ -81,14 +79,14 @@ let translate_top = (input, env) => {
         let val = translate_top(item, env);
         jsargs.push(val);
       });
-      return "env.fget('" + sym + "').fcall(" + jsargs.join(', ') + ")";
+      return env.to_jsstring() + ".fget('" + sym + "').fcall(" + jsargs.join(', ') + ")";
     }
   }
 
   if (ty.is_symbol(input)) {
     if (input.is_selfevaluating())
-      return "Symbol('" + input.to_string() + "')";
-    return "env.get('" + input.to_string() + "')";
+      return "ty.symbol('" + input.to_string() + "')";
+    return env.to_jsstring() + ".get('" + input.to_string() + "')";
   }
   if (ty.is_atom(input)) {
     return input.to_jsstring();
