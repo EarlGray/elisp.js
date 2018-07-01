@@ -37,7 +37,7 @@ LispInteger.prototype = Object.create(LispObject.prototype);
 
 LispInteger.prototype.to_string = function() { return this.num; };
 LispInteger.prototype.to_js = function() { return this.num; };
-LispInteger.prototype.to_jsstring = function() { return '' + this.num; };
+LispInteger.prototype.to_jsstring = function() { return 'ty.integer(' + this.num + ')'; };
 
 LispInteger.prototype.equals = function(that) {
   return that && that.__proto__ == this.__proto__
@@ -195,7 +195,7 @@ LispString.prototype.to_string = function() {
 };
 
 LispString.prototype.to_js = function() { return this.to_string(); };
-LispString.prototype.to_jsstring = function() { return this.to_string(); };
+LispString.prototype.to_jsstring = function() { return 'ty.string(' + this.to_string() + ')'; };
 
 LispString.prototype.seqlen = function() {
   return this.str.length;

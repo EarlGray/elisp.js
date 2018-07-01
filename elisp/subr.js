@@ -1,6 +1,9 @@
 'use strict';
 
+const util = require('util');
+
 const ty = require('elisp/types.js');
+const translator = require('elisp/translator.js');
 
 let subroutines = {};
 
@@ -8,6 +11,17 @@ function define_subr(name, args, func, doc) {
   let subr = new ty.LispSubr(name, args, func, doc);
   subroutines[name] = subr;
 };
+
+define_subr('jscode', [],
+function(expr) {
+  let jscode = translator.translate(expr);
+  return ty.string(jscode);
+});
+
+define_subr('jsrepr', [],
+function(expr) {
+  return ty.string(util.inspect(expr));
+});
 
 /*
  *

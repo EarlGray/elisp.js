@@ -20,20 +20,6 @@ let assertThrows = (input) => {
 };
 
 
-describe('translator', () => {
-  const translate = require('elisp/translator').translate;
-
-  describe('atom', () => {
-    it("translates strings",    () => assert.equal(translate(ty.string("hello")), '"hello"'));
-    it("translates numbers",    () => assert.equal(translate(ty.integer(42)), "42"));
-    it("translates nil",        () => assert.equal(translate(ty.nil), "ty.nil"));
-    it("translates symbols",
-        () => assert.equal(translate(ty.symbol("foo")), "global.env.get('foo')"));
-    it("translates keyword symbols",
-        () => assert.equal(translate(ty.symbol(":bar")), "ty.symbol(':bar')"));
-  });
-});
-
 describe('environment', () => {
   describe('global variables', () => {
     it("should set it",     () => assertEval("(progn (setq x 42) x)", 42));

@@ -94,4 +94,4 @@ let translate_top = (input, env) => {
   throw new Error('Failed to translate: ' + input.to_string());
 };
 
-exports.translate = (input) => translate_top(input, new Environment());
+exports.translate = (input, env) => translate_top(input, env || new Environment());
