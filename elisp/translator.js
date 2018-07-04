@@ -12,18 +12,6 @@ let specials = {
     return what.to_jsstring();
   },
 
-  'if': function(args, env) {
-    args = args.to_array();
-    if (args.length != 3)
-      throw new Error('Wrong number of arguments: if, ' + args.length);
-
-    let cond = translate_top(args[0], env);
-    let thenb = translate_top(args[1], env);
-    let elseb = translate_top(args[2], env);
-
-    return '(!(' + cond + ').is_false ? (' + thenb + ') : (' + elseb + '))';
-  },
-
   'setq': function(args, env) {
     args = args.to_array();
     if (args.length % 2)
@@ -45,6 +33,76 @@ let specials = {
     return env.to_jsstring() + ".set(" + pairs.join(", ") + ")";
   },
 
+  'let': function(args, env) {
+    args = args.to_array();
+    if (args.length < 1 || 2 < args.length)
+      throw new Error('Wrong number of arguments: let', args.length);
+    if (!ty.is_sequence(args[0]))
+      throw new Error('Wrong type of argument: sequencep, 2');
+
+    if (args[0].is_false)
+      return translate_top(args[1] || ty.nil, env);
+
+    let names = [];
+    let values = [];
+    let errors = [];
+    args[0].forEach((binding) => {
+      if (ty.is_symbol(binding)) {
+        names.push(binding);
+        values.push(ty.nil.to_jsstring());
+      } else if (ty.is_list(binding)) {
+        let name = binding.hd;
+        binding = binding.tl;
+        let jsval = translate_top(binding.hd || ty.nil, env);
+        binding = binding.tl;
+        if (binding && !binding.is_false) {
+          let msg = "'let' bindings can have only one value-form: " + name.to_string();
+          errors.push(msg);
+        } else {
+          names.push(name);
+          values.push(jsval);
+        }
+      } else
+        throw new Error('Wrong type argument: listp, ' + binding.to_string());
+    });
+
+    if (errors.length) {
+      return `() => {
+        throw new Error("${errors[0]}");
+      })()`;
+    }
+
+    names = names.map((n) => "`" + n.to_string() + "`");
+    let bindings = [];
+    for (let i = 0; i < names.length; ++i) {
+      bindings.push(names[i]);
+      bindings.push(values[i]);
+    }
+
+    let jscode = ty.nil.to_jsstring();
+    if (args[1]) {
+      jscode = translate_top(args[1], env);
+    }
+    return `(() => {
+      ${env.to_jsstring()}.push(${bindings.join(', ')});
+      let result = ${jscode};
+      ${env.to_jsstring()}.pop(${names.join(', ')});
+      return result;
+    })()`;
+  },
+
+  'if': function(args, env) {
+    args = args.to_array();
+    if (args.length != 3)
+      throw new Error('Wrong number of arguments: if, ' + args.length);
+
+    let cond = translate_top(args[0], env);
+    let thenb = translate_top(args[1], env);
+    let elseb = translate_top(args[2], env);
+
+    return '(!(' + cond + ').is_false ? (' + thenb + ') : (' + elseb + '))';
+  },
+
   'progn': function(args, env) {
     if (args.is_false)
       return ty.nil.to_jsstring();
@@ -63,7 +121,7 @@ let specials = {
 
 let translate_top = (input, env) => {
   if (input.is_false) {
-    return "ty.nil";
+    return ty.nil.to_jsstring();
   }
   if (ty.is_list(input)) {
     let hd = input.hd;

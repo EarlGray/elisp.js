@@ -26,7 +26,7 @@ describe('environment', () => {
     it("should re-set it",  () => assertEval("(progn (setq x :ignore) (setq x 42) x)", 42));
   });
 
-  xdescribe('local variables', () => {
+ xdescribe('local variables', () => {
     it("should shadow globals",
         () => assertEval("(progn (setq x 42) (let ((x :ignore)) x) x)", 42));
 
@@ -64,28 +64,30 @@ describe('special forms', () => {
           () => assertEval("(progn (setq one 1 two 2) (+ one two))", 3));
     });
 
-    xdescribe('let', () => {
+    describe('let', () => {
       it("should make a binding",
           () => assertEval("(let ((x 12)) x)", 12));
       it("should make a nil binding",
-          () => assertEval("(let (false) false)", ty.nil));
+          () => assertEval("(let (false) false)", "nil"));
       it("should make two bindings",
           () => assertEval("(let ((x 12) (y 15)) (+ x y))", 27));
       it("should make a nested let",
           () => assertEval("(let ((x 12)) (let ((y 15)) (+ x y)))", 27));
       it("should make a nested let with shadowing",
-          () => assertEval("(let ((x :ignore)) (let ((x 42)) x)))", 42));
+          () => assertEval("(let ((x :ignore)) (let ((x 42)) x))", 42));
       it("nested let should keep outer values",
           () => assertEval("(let ((x 42)) (progn (let ((x :ignore)) x) x))", 42));
 
       it("(let () 'ok)",        () => assertEval("(let () 'ok)", "ok"));
       it("(let [] 'ok)",        () => assertEval("(let [] 'ok)", "ok"));
-      it("should set (let ((it)) it) to nil", () => assertEval("(let ((it)) it)", ty.nil));
-      it("should return nil for empty body",  () => assertEval("(let ((it 'pass)))", ty.nil));
+      it("should set (let ((it)) it) to nil",
+          () => assertEval("(let ((it)) it)", "nil"));
+      it("should return nil for empty body",
+          () => assertEval("(let ((it 'pass)))", "nil"));
 
       it("should not see its own bindings",
           () => assertThrows("(let ((x 1) (y x)) y)", "Symbol's value as variable is void: x"));
-      it("let* should see its own bindings",
+      xit("let* should see its own bindings",
           () => assertEval("(let* ((x 42) (y x)) y)", 42));
 
       it("should fail if bindings are not a sequence",

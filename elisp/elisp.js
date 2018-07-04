@@ -7,12 +7,12 @@ const Environment = require('elisp/environment').Environment;
 
 function eval_lisp(expr, env) {
   env = env || new Environment('env');
-  let jscode = translator.translate(expr, env);
 
   let result;
   let saved_env = global[env.name];
   try {
     global[env.name] = env;
+    let jscode = translator.translate(expr, env);
     result = eval(jscode);
   } finally {
     global[env.name] = saved_env;

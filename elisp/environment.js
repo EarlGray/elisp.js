@@ -4,33 +4,22 @@ const ty = require('elisp/types');
 const subr = require('elisp/subr');
 
 function Environment(name) {
-  this.fs = {};
-  this.vs = {};
   this.name = name || 'env';
+
+  /* functions: name->LispFun */
+  this.fs = {};
+
+  /* values */
+  this.vs = {};
 }
 
 Environment.prototype.to_jsstring = function() {
   return 'global.' + this.name;
 }
 
-Environment.prototype.set = function() {
-  let i = 0;
-  let value;
-  while (i < arguments.length) {
-    let name = arguments[i];
-    value = arguments[i+1];
-    this.vs[name] = value;
-    i += 2;
-  }
-  return value;
-}
-
-Environment.prototype.get = function(name) {
-  if (name in this.vs)
-    return this.vs[name];
-  throw new Error("Symbol's value as variable is void: " + name);
-}
-
+/*
+ *  functions namespace
+ */
 Environment.prototype.fset = function(name, value) {
   this.fs[name] = value;
   return ty.symbol(name);
@@ -38,10 +27,60 @@ Environment.prototype.fset = function(name, value) {
 
 Environment.prototype.fget = function(name) {
   let fun = this.fs[name] || subr.all[name];
-  if (!fun) 
+  if (!fun)
     throw new Error("Symbol's function definition is void: " + name);
   fun.env = this;
   return fun;
+}
+
+/*
+ *  values namespace
+ */
+Environment.prototype.set = function() {
+  let i = 0;
+  let value;
+  while (i < arguments.length) {
+    let name = arguments[i];
+    value = arguments[i+1];
+
+    if (this.vs[name] && this.vs[name].length) {
+      this.vs[name][0] = value;
+    } else {
+      this.vs[name] = [value];
+    }
+
+    i += 2;
+  }
+  return value;
+}
+
+Environment.prototype.get = function(name) {
+  if (this.vs[name])
+    return this.vs[name][0];
+  throw new Error("Symbol's value as variable is void: " + name);
+}
+
+Environment.prototype.push = function() {
+  let i = 0;
+  while (i < arguments.length) {
+    let name = arguments[i];
+    let value = arguments[i+1];
+
+    if (this.vs[name] && this.vs[name].length) {
+      this.vs[name].unshift(value);
+    } else {
+      this.vs[name] = [value];
+    }
+
+    i += 2;
+  }
+}
+
+Environment.prototype.pop = function() {
+  for (let i = 0; i < arguments.length; ++i) {
+    let name = arguments[i];
+    this.vs[name].shift();
+  }
 }
 
 exports.Environment = Environment;

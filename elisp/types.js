@@ -234,6 +234,9 @@ LispVector.prototype = Object.create(LispObject.prototype);
 Object.defineProperty(LispVector.prototype,
   'is_array', { value: true, writable: false }
 );
+Object.defineProperty(LispVector.prototype,
+  'is_seq', { value: true, writable: false }
+);
 
 LispVector.prototype.to_string = function() {
   return '[' + this.arr.map(obj => obj.to_string()).join(' ') + ']';
@@ -249,6 +252,10 @@ LispVector.prototype.equals = function(that) {
   return that && that.__proto__ == this.__proto__
     && this.arr.length == that.arr.length
     && this.arr.every((v, i) => that.arr[i].equals(v));
+};
+
+LispVector.prototype.forEach = function(callback) {
+  this.arr.forEach((item) => callback(item));
 };
 
 /*
