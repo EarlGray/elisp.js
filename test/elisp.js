@@ -16,7 +16,7 @@ let assertEval = (input, output) => {
 };
 let assertThrows = (input) => {
   /* TODO : make it check error message */
-  assert.throws(() => elisp.eval_test(input, env), Error);
+  assert.throws(() => elisp.eval_text(input, env), ty.LispError);
 };
 
 
@@ -26,7 +26,7 @@ describe('environment', () => {
     it("should re-set it",  () => assertEval("(progn (setq x :ignore) (setq x 42) x)", 42));
   });
 
- xdescribe('local variables', () => {
+ describe('local variables', () => {
     it("should shadow globals",
         () => assertEval("(progn (setq x 42) (let ((x :ignore)) x) x)", 42));
 
@@ -110,7 +110,7 @@ describe('special forms', () => {
           () => assertEval("(let ((it 'pass)))", "nil"));
 
       it("should not see its own bindings",
-          () => assertThrows("(let ((x 1) (y x)) y)", "Symbol's value as variable is void: x"));
+          () => assertThrows("(let ((a 1) (b a)) b)"));
       xit("let* should see its own bindings",
           () => assertEval("(let* ((x 42) (y x)) y)", 42));
 
@@ -159,9 +159,22 @@ describe('functions', () => {
     it("should apply", () => assertEval("((lambda (x) (* x x)) 12)", 144));
     it("should create and apply function",
         () => assertEval("(progn (fset 'sqr (lambda (x) (* x x))) (sqr 12))", 144));
+    it("((lambda ())) === nil",
+        () => assertEval("((lambda ()))", "nil"));
 
-    it("(lambda) should be invalid",
+    xit("((lambda . 1)) should be invalid",
+        () => assertThrows("((lambda . 1))", "Wrong type argument: listp, 1"));
+    xit("((lambda)) should be invalid",
         () => assertThrows("((lambda))", "Invalid function: (lambda)"));
+
+    it("should check argument count (1 to 2)",
+        () => assertThrows("((lambda (x y) x) 42)", "Wrong number of arguments: (lambda (x y) x), 1"));
+    it("should check argument count (0 to 1)",
+        () => assertThrows("((lambda (x) x))",
+          "Wrong number of arguments: (lambda (x) x), 0"));
+    it("should check argument count (1 to 0)",
+        () => assertThrows("((lambda () 42) :dummy)",
+          "Wrong number of arguments: (lambda nil 42), 1"));
   });
 
   describe('arguments', () => {
@@ -185,8 +198,8 @@ describe('functions', () => {
 });
 
 
-describe('macros', () => {
-  xit("fset's macro", () => {
+xdescribe('macros', () => {
+  it("fset's macro", () => {
     let _fset = "(fset 'twice '(macro lambda (fn arg) `(,fn (,fn ,arg))))";
     let _sqr =  "(fset 'sqr (lambda (x) (* x x)))";
     assertEval(`(progn ${_fset} ${_sqr} (twice sqr 2))`, 16);

@@ -19,9 +19,9 @@ function define_subr(name, args, func, doc) {
 /*
  *  introspection
  */
-define_subr('jsrepr', [],
-  function(expr) { return ty.string(util.inspect(expr)); }
-);
+define_subr('jsrepr', [], function(expr) {
+  return ty.string(util.inspect(expr));
+});
 
 define_subr('jscode', [],
 function(expr) {
@@ -29,6 +29,10 @@ function(expr) {
   return ty.string(jscode);
 });
 
+define_subr('jseval', [],
+function(expr) {
+  return eval(expr.to_js());
+});
 
 /*
  *  integer operations
@@ -57,6 +61,13 @@ function(sym) {
   return this.fget(sym.to_string());
 });
 
+/*
+ *  Errors
+ */
+define_subr('error', [ty.is_symbol, ty.is_string],
+function(tag, message) {
+  throw new ty.LispError(message.to_js());
+});
 
 /*
  *  Exports

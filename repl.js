@@ -61,7 +61,11 @@ rl.on('line', (line) => {
   try {
     console.log(loop(line));
   } catch (e) {
-    console.error(e.stack);
+    let jsdebug = env.has_jsdebug();
+    if (e instanceof ty.LispError && jsdebug)
+      console.error(e.name + ': ' + e.message);
+    else
+      console.error(e.stack);
   };
 
   rl.prompt();

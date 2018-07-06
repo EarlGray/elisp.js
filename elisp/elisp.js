@@ -3,7 +3,25 @@
 const ty = require('elisp/types');
 const parser = require('elisp/parser');
 const translator = require('elisp/translator');
+
 const Environment = require('elisp/environment').Environment;
+
+function fcall(args, env) {
+  /* `this` is LispFun, do not call otherwise */
+  if (args.length != this.args.length)
+    throw new ty.LispError('Wrong number of arguments: ' + this.to_string() + ', ' + args.length);
+  args.forEach((val, i) => { this.bindings[i+i+1] = val; });
+
+  this.func = translator.translate(this.body, env);
+
+  try {
+    env.push.apply(env, this.bindings);
+    var result = eval(this.func);
+  } finally {
+    env.pop.apply(env, this.args);
+  }
+  return result;
+}
 
 function eval_lisp(expr, env) {
   env = env || new Environment('env');
@@ -27,5 +45,10 @@ function eval_text(input, env) {
   return result.to_string();
 }
 
+/*
+ *  Exports
+ */
 exports.eval_text = eval_text;
 exports.eval_lisp = eval_lisp;
+
+exports.fcall = fcall;

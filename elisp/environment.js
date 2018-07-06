@@ -15,7 +15,7 @@ function Environment(name) {
 
 Environment.prototype.to_jsstring = function() {
   return 'global.' + this.name;
-}
+};
 
 /*
  *  functions namespace
@@ -28,7 +28,7 @@ Environment.prototype.fset = function(name, value) {
 Environment.prototype.fget = function(name) {
   let fun = this.fs[name] || subr.all[name];
   if (!fun)
-    throw new Error("Symbol's function definition is void: " + name);
+    throw new ty.LispError("Symbol's function definition is void: " + name);
   fun.env = this;
   return fun;
 }
@@ -52,13 +52,13 @@ Environment.prototype.set = function() {
     i += 2;
   }
   return value;
-}
+};
 
 Environment.prototype.get = function(name) {
   if (this.vs[name])
     return this.vs[name][0];
-  throw new Error("Symbol's value as variable is void: " + name);
-}
+  throw new ty.LispError("Symbol's value as variable is void: " + name);
+};
 
 Environment.prototype.push = function() {
   let i = 0;
@@ -74,13 +74,24 @@ Environment.prototype.push = function() {
 
     i += 2;
   }
-}
+};
 
 Environment.prototype.pop = function() {
   for (let i = 0; i < arguments.length; ++i) {
     let name = arguments[i];
     this.vs[name].shift();
   }
-}
+};
+
+Environment.prototype.is_bound = function(name) {
+  return this.vs[name] && this.vs[name].length;
+};
+Environment.prototype.is_fbound = function(name) {
+  return this.fs[name];
+};
+
+Environment.prototype.has_jsdebug = function() {
+  return !(this.is_bound('*jsdebug*') && !this.get('*jsdebug*').is_false);
+};
 
 exports.Environment = Environment;

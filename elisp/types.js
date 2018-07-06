@@ -9,7 +9,8 @@ function from_js(val) {
     case 'number': return new LispInteger(val);
     case 'string': return new LispString(val);
     case 'symbol': return new LispSymbol(val.toString().slice(7, -1));
-    default: throw new Error('Failed to lispify: ' + val.toString());
+    case 'undefined': return LispNil;
+    default: throw new LispError('Failed to lispify: ' + val.toString());
   }
 }
 
@@ -80,6 +81,7 @@ NilClass.prototype.to_string = () => "nil";
 NilClass.prototype.to_js = () => LispNil;
 NilClass.prototype.to_jsstring = () => "ty.nil";
 NilClass.prototype.to_array = () => [];
+NilClass.prototype.is_selfevaluating = () => true;
 
 // you can be everything you want to be:
 Object.defineProperty(NilClass.prototype, 'is_symbol', { value: true, writable: false });
@@ -115,7 +117,7 @@ LispCons.prototype.forEach = function(callback) {
   while (cur != LispNil) {
     callback(cur.hd);
     if (!cur.tl.is_list)
-      throw new Error('LispCons.forEach: not a regular list');
+      throw new LispError('LispCons.forEach: not a regular list');
     cur = cur.tl;
   }
 };
@@ -195,7 +197,7 @@ LispString.prototype.to_string = function() {
   return '"' + str + '"';
 };
 
-LispString.prototype.to_js = function() { return this.to_string(); };
+LispString.prototype.to_js = function() { return this.str; };
 LispString.prototype.to_jsstring = function() { return 'ty.string(' + this.to_string() + ')'; };
 
 LispString.prototype.seqlen = function() {
@@ -275,12 +277,35 @@ LispBoolvector.prototype = Object.create(LispObject.prototype);
 /*
  *  lambda
  */
-function LispFun(args, body) {
+function LispFun(args, body, interact, doc) {
+  this.args = args;
+  this.body = body;
+  this.interact = interact;
+  this.doc = doc;
+
+  /* a template to fill */
+  let bindings = [];
+  for (let i = 0; i < args.length; ++i) {
+    bindings.push(args[i]);
+    bindings.push(LispNil);
+  }
+  this.bindings = bindings;
 };
 LispFun.prototype = Object.create(LispObject.prototype);
 
-LispFun.prototype.fcall = function() {
-  throw new Error('TODO');
+LispFun.prototype.to_string = function() {
+  let argl = consify(this.args.map((arg) => new LispSymbol(arg)));
+  let body = this.body;
+  if (body.hd && (body.hd.to_string() === 'progn')) {
+    body = body.tl;
+  }
+  let fun = consify([new LispSymbol('lambda'), argl, body]);
+  return fun.to_string();
+};
+
+LispFun.prototype.fcall = function(args, env) {
+  LispFun.fcall = LispFun.fcall || require('elisp/elisp').fcall;
+  return LispFun.fcall.call(this, args, env);
 };
 
 /*
@@ -303,11 +328,9 @@ LispSubr.prototype.to_string = function() { return "#<subr " + this.name + ">"; 
 LispSubr.prototype.to_js = function() { return this.func; }
 LispSubr.prototype.to_jsstring = function () { return "subr.all['" + this.name + "']"; };
 
-LispSubr.prototype.fcall = function() {
-  // console.error('### fcall(' + Array.prototype.join.call(arguments, ', ') + ')');
-  // console.error(`### ${this.name}.fcall with env = ${this.env.to_jsstring()}`);
-  let func = this.func.bind(this.env);
-  let args = Array.prototype.map.call(arguments, from_js);
+LispSubr.prototype.fcall = function(args, env) {
+  let func = this.func.bind(env);
+  args = Array.prototype.map.call(args, from_js);
   let result = func.apply(func, args);
   return result;
 };
@@ -321,6 +344,25 @@ function LispMacro(transform) {
 
 LispMacro.prototype = Object.create(LispObject.prototype);
 
+
+/*
+ *  Errors
+ */
+function LispError() {
+  let err = Error.apply(this, arguments);
+  this.name = err.name = 'LispError';
+
+  this.message = err.message;
+  this.fileName = err.fileName;
+  this.lineNumber = err.lineNumber;
+
+  let stack = err.stack.split('\n');
+  this.stack = stack.slice(0, 1).concat(stack.slice(2)).join('\n');
+}
+
+LispError.prototype = Object.create(Error.prototype);
+
+
 /*
  *  exports
  */
@@ -332,6 +374,7 @@ exports.LispSymbol = LispSymbol;
 exports.LispString = LispString;
 exports.LispVector = LispVector;
 exports.LispSubr = LispSubr;
+
 
 exports.is_atom = (obj) => (obj == LispNil) || !obj.is_list;
 exports.is_list = (obj) => obj.is_list;
@@ -350,8 +393,11 @@ exports.symbol  = (s) => new LispSymbol(s);
 exports.list    = (arr) => consify(arr);
 exports.vector  = (arr) => new LispVector(arr);
 exports.string  = (s) => new LispString(s);
-exports.lambda  = () => new LispFun();
+exports.lambda  = (argspec, body, interact, doc) => new LispFun(argspec, body, interact, doc);
 
 exports.cons    = (h, t) => new LispCons(h, t);
 
 exports.from_js = from_js;
+
+/* errors */
+exports.LispError = LispError;

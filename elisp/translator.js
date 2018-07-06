@@ -6,7 +6,7 @@ const Environment = require('elisp/environment').Environment;
 let specials = {
   'quote': function(args) {
     if (args.is_false || !args.tl.is_false)
-      throw new Error('Wrong number of arguments: quote, ' + args.seqlen());
+      throw new ty.LispError('Wrong number of arguments: quote, ' + args.seqlen());
 
     let what = args.hd;
     return what.to_jsstring();
@@ -15,7 +15,7 @@ let specials = {
   'setq': function(args, env) {
     args = args.to_array();
     if (args.length % 2)
-      throw new Error('Wrong number of arguments: setq' + args.length);
+      throw new ty.LispError('Wrong number of arguments: setq, ' + args.length);
 
     let pairs = [];
     let i = 0;
@@ -23,9 +23,9 @@ let specials = {
       let name = args[i];
       let value = args[i+1];
       if (!ty.is_symbol(name))
-        throw new Error('Wrong type argument: symbolp, ' + name.to_string());
+        throw new ty.LispError('Wrong type argument: symbolp, ' + name.to_string());
       if (name.is_selfevaluating())
-        throw new Error('Attempt to set a constant symbol: ' + ty.to_string());
+        throw new ty.LispError('Attempt to set a constant symbol: ' + name.to_string());
       pairs.push("'" + name.to_string() + "'");
       pairs.push(translate_top(value, env));
       i += 2;
@@ -35,15 +35,16 @@ let specials = {
 
   'let': function(args, env) {
     if (args.is_false)
-      throw new Error('Wrong number of arguments: let', 0);
+      throw new ty.LispError('Wrong number of arguments: let', 0);
     if (!ty.is_list(args))
-      throw new Error('Wrong type argument: listp, ' + args.to_jsstring());
+      throw new ty.LispError('Wrong type argument: listp, ' + args.to_jsstring());
 
     let varlist = args.hd;
     let body = args.tl;
     if (!ty.is_list(body))
-      throw new Error('Wrong type argument: listp, ' + body.to_jsstring());
+      throw new ty.LispError('Wrong type argument: listp, ' + body.to_jsstring());
 
+    console.error('### let: body = ' + body.to_string());
     if (body.is_false)
       body = ty.nil
     else if (body.tl.is_false)
@@ -52,7 +53,7 @@ let specials = {
       body = ty.cons(ty.symbol('progn'), body);
 
     if (!ty.is_sequence(varlist))
-      throw new Error('Wrong type of argument: sequencep, 2');
+      throw new ty.LispError('Wrong type of argument: sequencep, 2');
     if (varlist.is_false)
       return translate_top(body, env);
 
@@ -71,17 +72,22 @@ let specials = {
         if (binding && !binding.is_false) {
           let msg = "'let' bindings can have only one value-form: " + name.to_string();
           errors.push(msg);
+        } else if (!ty.is_symbol(name)) {
+          errors.push("Wrong type argument: symbolp, " + name.to_string());
+        } else if (name.is_selfevaluating()) {
+          let msg = "Attempt to set a constant symbol: " + name.to_string();
+          errors.push(msg);
         } else {
           names.push(name);
           values.push(jsval);
         }
       } else
-        throw new Error('Wrong type argument: listp, ' + binding.to_string());
+        throw new ty.LispError('Wrong type argument: listp, ' + binding.to_string());
     });
 
     if (errors.length) {
-      return `() => {
-        throw new Error("${errors[0]}");
+      return `(() => {
+        throw new ty.LispError("${errors[0]}");
       })()`;
     }
 
@@ -104,7 +110,7 @@ let specials = {
   'if': function(args, env) {
     args = args.to_array();
     if (args.length != 3)
-      throw new Error('Wrong number of arguments: if, ' + args.length);
+      throw new ty.LispError('Wrong number of arguments: if, ' + args.length);
 
     let cond = translate_top(args[0], env);
     let thenb = translate_top(args[1], env);
@@ -129,18 +135,33 @@ let specials = {
   },
 
   'lambda': function(args, env) {
+    let error = (msg, tag) => {
+      return `ty.lambda([], ty.list([ty.symbol('error'), ty.string('${msg}')]))`
+    };
+    if (args.is_false)
+      return error("Invalid function: (lambda)");
     if (!ty.is_list(args))
-      return '(() => throw new Error("Wrong type argument: listp, 1"))';
+      return error('Wrong type argument: listp, 1');
 
     let repr = ty.cons(ty.symbol('lambda'), args);
     let body = args.tl || ty.nil;
     let argv = args.hd || ty.nil;
     if (!ty.is_list(argv))
-      return `(() => throw new Error("Invalid function: ${repr.to_string()}"))`;
+      return error(`Invalid function: ${repr.to_string()}`);
 
     let argspec = argv.to_array();
     if (argspec.find((arg) => !ty.is_symbol(arg)))
-      return `(() => throw new Error("Invalid function: ${repr.to_string()}"))`;
+      return error(`Invalid function: ${repr.to_string()}`);
+
+    if (body.is_false) {
+      // do nothing, it must evaluate to nil
+    } else if (body.tl.is_false) {
+      // single form, extract
+      body = body.hd;
+    } else {
+      // mutliple forms, prepend `progn`
+      body = ty.cons(ty.symbol('progn'), body);
+    }
 
     argspec = argspec.map((arg) => "'" + arg.to_string() + "'");
     argspec = '[' + argspec.join(', ') + ']';
@@ -167,28 +188,31 @@ let translate_top = (input, env) => {
 
       callable = env.to_jsstring() + ".fget('" + sym + "')";
     } else if (ty.is_list(hd)) {
-      callable = translate_top(hd, env) + '.fcall()';
+      callable = translate_top(hd, env);
     } else {
-      callable = `(() => throw new Error('Invalid function: ${hd.to_string()}'))`;
+      callable = `(() => throw new ty.LispError('Invalid function: ${hd.to_string()}'))`;
     }
 
+    let jsenv = env.to_jsstring();
     let jsargs = [];
     args.forEach && args.forEach((item) => {
       let val = translate_top(item, env);
       jsargs.push(val);
     });
-    return callable + ".fcall(" + jsargs.join(', ') + ")";
+    jsargs = '[' + jsargs.join(', ') + ']';
+
+    return callable + `.fcall(${jsargs}, ${jsenv})`;
   }
 
   if (ty.is_symbol(input)) {
     if (input.is_selfevaluating())
-      return "ty.symbol('" + input.to_string() + "')";
+      return input.to_jsstring();
     return env.to_jsstring() + ".get('" + input.to_string() + "')";
   }
   if (ty.is_atom(input)) {
     return input.to_jsstring();
   }
-  throw new Error('Failed to translate: ' + input.to_string());
+  throw new ty.LispError('Failed to translate: ' + input.to_string());
 };
 
 exports.translate = (input, env) => translate_top(input, env || new Environment());
