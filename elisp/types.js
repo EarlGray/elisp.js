@@ -375,7 +375,7 @@ exports.LispString = LispString;
 exports.LispVector = LispVector;
 exports.LispSubr = LispSubr;
 
-
+exports.any = () => true;
 exports.is_atom = (obj) => (obj == LispNil) || !obj.is_list;
 exports.is_list = (obj) => obj.is_list;
 exports.is_sequence = (obj) => obj.is_seq;

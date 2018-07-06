@@ -44,6 +44,16 @@ describe('environment', () => {
   describe('void variables', () => {
     it("should throw on a non-existent variable", () => assertThrows("no-such"));
   });
+
+  describe('dynamic scope', () => {
+    it("should use dynamic scope", () => {
+      let code = `(progn
+        (fset 'incx (lambda () (setq x (+ 1 x))))
+        (let ((x 3)) (incx) x))
+      `;
+      assertEval(code, 4);
+    });
+  });
 });
 
 describe('types', () => {
