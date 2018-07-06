@@ -46,6 +46,30 @@ describe('environment', () => {
   });
 });
 
+describe('types', () => {
+  xdescribe('booleanp', () => {
+    it("should recognize t", () => assertEval("(booleanp t)", "t"));
+    it("should recognize nil", () => assertEval("(booleanp nil)", "t"));
+    it("should not recognize anything else", () => assertEval("(booleanp 0)", "nil"));
+  });
+
+  xdescribe('subrp', () => {
+    it("should accept subrs", () => assertEval("(subrp (symbol-function '+))", "t"));
+    it("should reject functions", () => assertEval("(subrp (lambda (x) x))", "nil"));
+  });
+  xdescribe('functionp', () => {
+    it("should accept functions", () => assertEval("(functionp (symbol-function '+))", "t"));
+    it("should accept functions", () => assertEval("(functionp (lambda (x) x))", "t"));
+    it("should reject others", () => {
+      let code = `(progn
+        (defmacro twice (fn x) \`(,f (,f ,x)))
+        (functionp (symbol-function 'twice)))`;
+      assertEval(code, "nil");
+    });
+  });
+});
+
+
 describe('special forms', () => {
   describe('quote', () => {
     it("should quote!",         () => assertEval("'foo", "foo"));
@@ -101,6 +125,9 @@ describe('special forms', () => {
       it("should reject ('wrongtype 42)",
           () => assertThrows("(let (('wrong-type 42)) 'wrong-type)",
             "Wrong type argument: symbolp, (quote wrong-type)"));
+
+      it("should take blocks",
+          () => assertEval("(let () 'first 'second 'result)", "result"));
     });
   });
 
@@ -118,5 +145,50 @@ describe('special forms', () => {
         assertEval("(progn (setq x 1) (setq x (+ x 1)) (setq x (* x 2)) x)", 4);
       });
     });
+  });
+});
+
+
+describe('functions', () => {
+  describe('fset/symbol-function', () => {
+    it("should set and get",
+        () => assertEval("(progn (fset 'lol 'gotcha) (symbol-function 'lol))", "gotcha"));
+  });
+
+  describe('lambda', () => {
+    it("should apply", () => assertEval("((lambda (x) (* x x)) 12)", 144));
+    it("should create and apply function",
+        () => assertEval("(progn (fset 'sqr (lambda (x) (* x x))) (sqr 12))", 144));
+
+    it("(lambda) should be invalid",
+        () => assertThrows("((lambda))", "Invalid function: (lambda)"));
+  });
+
+  describe('arguments', () => {
+    it("should take no arguments", () => assertEval("((lambda ()))", "nil"));
+    it("should take one argument", () => assertEval("((lambda (x) x) 42)", 42));
+    it("should take two arguments", () => assertEval("((lambda (x y) (+ x y)) 2 2)", 4));
+
+    it("should take symbols only",
+        () => assertThrows("((lambda (1) 1) 1)", "Invalid function: (lambda (1) 1)"));
+  });
+
+  xdescribe('defun', () => {
+    it("(defun sqr (x) (* x x))",
+        () => assertEval("(progn (defun sqr (x) (* x x)) (let ((x 12)) (sqr x)))", 144));
+  });
+
+  xdescribe('funcall/apply', () => {
+  });
+  xdescribe('apply-partially', () => {
+  });
+});
+
+
+describe('macros', () => {
+  xit("fset's macro", () => {
+    let _fset = "(fset 'twice '(macro lambda (fn arg) `(,fn (,fn ,arg))))";
+    let _sqr =  "(fset 'sqr (lambda (x) (* x x)))";
+    assertEval(`(progn ${_fset} ${_sqr} (twice sqr 2))`, 16);
   });
 });
