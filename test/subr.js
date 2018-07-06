@@ -18,8 +18,10 @@ describe('subr', () => {
     it("(+ 'one 'one) fails",   () => assert.throws(() => eval_text("(+ 'two 'two)")));
   });
 
-  xdescribe('car', () => {
-    it("(car nil) == nil",      () => assert.equal(eval_text("(car nil)", "nil")));
-    it("(car '(1 2)) == 1",     () => assert.equal(eval_text("(car '(1 2))", 1)));
+  describe('car/cdr', () => {
+    it("(car nil) == nil",      () => assert.equal(eval_text("(car nil)"), "nil"));
+    it("(car '(1 2)) == 1",     () => assert.equal(eval_text("(car '(1 2))"), 1));
+    it("(cdr nil) == nil",      () => assert.equal(eval_text("(cdr nil)"), "nil"));
+    it("(cdr '(1 2)) == 1",     () => assert.equal(eval_text("(cdr '(1 2))"), "(2)"));
   });
 });

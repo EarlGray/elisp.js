@@ -44,7 +44,7 @@ let specials = {
     if (!ty.is_list(body))
       throw new ty.LispError('Wrong type argument: listp, ' + body.to_jsstring());
 
-    console.error('### let: body = ' + body.to_string());
+    //console.error('### let: body = ' + body.to_string());
     if (body.is_false)
       body = ty.nil
     else if (body.tl.is_false)
@@ -132,6 +132,24 @@ let specials = {
     stmts.push('return ' + translate_top(last, env) + ';\n');
 
     return '(() => { ' + stmts.join(';\n') + '})()';
+  },
+
+  'while': function(args, env) {
+    if (args.is_false)
+      throw new ty.LispError("Wrong number of arguments: while, 0");
+    let condition = args.hd;
+    let body = args.tl;
+
+    condition = translate_top(condition, env);
+    if (body.is_false) {
+      body = ''
+    } else if (body.tl.is_false) {
+      body = translate_top(body.hd, env);
+    } else {
+      body = ty.cons(ty.symbol('progn'), body);
+      body = translate_top(body, env);
+    }
+    return `(() => { while (!${condition}.is_false) { ${body} }; return ty.nil; })()`;
   },
 
   'lambda': function(args, env) {

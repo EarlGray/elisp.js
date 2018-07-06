@@ -47,16 +47,31 @@ function(expr) {
 /*
  *  integer operations
  */
-define_subr('+', [[], [], ty.is_number],
-function() {
+define_subr('+', [[], [], ty.is_number], function() {
   let sum = Array.prototype.reduce.call(arguments, (acc, e) => acc + e.to_js(), 0);
   return ty.integer(sum);
 });
+define_subr('-', [[ty.is_number], [], ty.is_number], function() {
+  let x = arguments[0].to_js();
+  return ty.integer(arguments[1] ? x - arguments[1].to_js() : -x);
+});
 
-define_subr('*', [[], [], ty.is_number],
-function() {
+define_subr('*', [[], [], ty.is_number], function() {
   return Array.prototype.reduce.call(arguments, (acc, e) => acc * e.to_js(), 1);
 });
+
+define_subr('<=', [[], [], ty.is_number], function() {
+  for (let i = 1; i < arguments.length; ++i)
+    if (arguments[i-1].to_js() > arguments[i].to_js())
+      return ty.nil;
+  return ty.symbol('t');
+});
+
+/*
+ *  Lists
+ */
+define_subr('car', [[ty.is_list]], function(lst) { return lst.hd; });
+define_subr('cdr', [[ty.is_list]], function(lst) { return lst.tl; });
 
 /*
  *  environment
@@ -77,6 +92,17 @@ function(sym) {
 define_subr('error', [[ty.is_symbol, ty.is_string]],
 function(tag, message) {
   throw new ty.LispError(message.to_js());
+});
+
+/*
+ *  Utils
+ */
+define_subr('print', [[ty.any]], function(expr) {
+  console.log(expr.to_string());
+  return expr;
+});
+define_subr('float-time', [[]], function() {
+  return ty.integer(Date.now() / 1000);
 });
 
 /*
