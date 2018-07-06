@@ -22,7 +22,7 @@ Environment.prototype.to_jsstring = function() {
  */
 Environment.prototype.fset = function(name, value) {
   this.fs[name] = value;
-  return ty.symbol(name);
+  return value;
 }
 
 Environment.prototype.fget = function(name) {
