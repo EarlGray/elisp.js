@@ -79,6 +79,7 @@ NilClass.prototype.toString = function() { return "[Object LispNil]"; };
 NilClass.prototype.to_string = () => "nil";
 NilClass.prototype.to_js = () => LispNil;
 NilClass.prototype.to_jsstring = () => "ty.nil";
+NilClass.prototype.to_array = () => [];
 
 // you can be everything you want to be:
 Object.defineProperty(NilClass.prototype, 'is_symbol', { value: true, writable: false });
@@ -274,9 +275,13 @@ LispBoolvector.prototype = Object.create(LispObject.prototype);
 /*
  *  lambda
  */
-function LispLambda() {
+function LispFun(args, body) {
 };
-LispLambda.prototype = Object.create(LispObject.prototype);
+LispFun.prototype = Object.create(LispObject.prototype);
+
+LispFun.prototype.fcall = function() {
+  throw new Error('TODO');
+};
 
 /*
  *  native subroutine
@@ -300,11 +305,21 @@ LispSubr.prototype.to_jsstring = function () { return "subr.all['" + this.name +
 
 LispSubr.prototype.fcall = function() {
   // console.error('### fcall(' + Array.prototype.join.call(arguments, ', ') + ')');
-  let func = this.func;
+  // console.error(`### ${this.name}.fcall with env = ${this.env.to_jsstring()}`);
+  let func = this.func.bind(this.env);
   let args = Array.prototype.map.call(arguments, from_js);
   let result = func.apply(func, args);
   return result;
 };
+
+/*
+ *  macros
+ */
+function LispMacro(transform) {
+  this.transform = transform;
+};
+
+LispMacro.prototype = Object.create(LispObject.prototype);
 
 /*
  *  exports
@@ -332,9 +347,11 @@ exports.is_symbol = (obj) => obj.is_symbol;
 exports.nil     = LispNil;
 exports.integer = (n) => new LispInteger(n);
 exports.symbol  = (s) => new LispSymbol(s);
-exports.cons    = (h, t) => new LispCons(h, t);
 exports.list    = (arr) => consify(arr);
 exports.vector  = (arr) => new LispVector(arr);
 exports.string  = (s) => new LispString(s);
+exports.lambda  = () => new LispFun();
+
+exports.cons    = (h, t) => new LispCons(h, t);
 
 exports.from_js = from_js;

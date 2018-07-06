@@ -34,19 +34,32 @@ let specials = {
   },
 
   'let': function(args, env) {
-    args = args.to_array();
-    if (args.length < 1 || 2 < args.length)
-      throw new Error('Wrong number of arguments: let', args.length);
-    if (!ty.is_sequence(args[0]))
-      throw new Error('Wrong type of argument: sequencep, 2');
+    if (args.is_false)
+      throw new Error('Wrong number of arguments: let', 0);
+    if (!ty.is_list(args))
+      throw new Error('Wrong type argument: listp, ' + args.to_jsstring());
 
-    if (args[0].is_false)
-      return translate_top(args[1] || ty.nil, env);
+    let varlist = args.hd;
+    let body = args.tl;
+    if (!ty.is_list(body))
+      throw new Error('Wrong type argument: listp, ' + body.to_jsstring());
+
+    if (body.is_false)
+      body = ty.nil
+    else if (body.tl.is_false)
+      body = body.hd;
+    else
+      body = ty.cons(ty.symbol('progn'), body);
+
+    if (!ty.is_sequence(varlist))
+      throw new Error('Wrong type of argument: sequencep, 2');
+    if (varlist.is_false)
+      return translate_top(body, env);
 
     let names = [];
     let values = [];
     let errors = [];
-    args[0].forEach((binding) => {
+    varlist.forEach((binding) => {
       if (ty.is_symbol(binding)) {
         names.push(binding);
         values.push(ty.nil.to_jsstring());
@@ -79,10 +92,7 @@ let specials = {
       bindings.push(values[i]);
     }
 
-    let jscode = ty.nil.to_jsstring();
-    if (args[1]) {
-      jscode = translate_top(args[1], env);
-    }
+    let jscode = body ? translate_top(body, env) : ty.nil.to_jsstring();
     return `(() => {
       ${env.to_jsstring()}.push(${bindings.join(', ')});
       let result = ${jscode};
@@ -117,7 +127,27 @@ let specials = {
 
     return '(() => { ' + stmts.join(';\n') + '})()';
   },
+
+  'lambda': function(args, env) {
+    if (!ty.is_list(args))
+      return '(() => throw new Error("Wrong type argument: listp, 1"))';
+
+    let repr = ty.cons(ty.symbol('lambda'), args);
+    let body = args.tl || ty.nil;
+    let argv = args.hd || ty.nil;
+    if (!ty.is_list(argv))
+      return `(() => throw new Error("Invalid function: ${repr.to_string()}"))`;
+
+    let argspec = argv.to_array();
+    if (argspec.find((arg) => !ty.is_symbol(arg)))
+      return `(() => throw new Error("Invalid function: ${repr.to_string()}"))`;
+
+    argspec = argspec.map((arg) => "'" + arg.to_string() + "'");
+    argspec = '[' + argspec.join(', ') + ']';
+    return `ty.lambda(${argspec}, ${body.to_jsstring()})`;
+  },
 };
+
 
 let translate_top = (input, env) => {
   if (input.is_false) {
@@ -125,6 +155,9 @@ let translate_top = (input, env) => {
   }
   if (ty.is_list(input)) {
     let hd = input.hd;
+    let args = input.tl;
+
+    let callable;
     if (ty.is_symbol(hd)) {
       let args = input.tl;
       let sym = hd.to_string();
@@ -132,13 +165,19 @@ let translate_top = (input, env) => {
       if (sym in specials)
         return (specials[sym])(args, env);
 
-      let jsargs = [];
-      args.forEach && args.forEach((item) => {
-        let val = translate_top(item, env);
-        jsargs.push(val);
-      });
-      return env.to_jsstring() + ".fget('" + sym + "').fcall(" + jsargs.join(', ') + ")";
+      callable = env.to_jsstring() + ".fget('" + sym + "')";
+    } else if (ty.is_list(hd)) {
+      callable = translate_top(hd, env) + '.fcall()';
+    } else {
+      callable = `(() => throw new Error('Invalid function: ${hd.to_string()}'))`;
     }
+
+    let jsargs = [];
+    args.forEach && args.forEach((item) => {
+      let val = translate_top(item, env);
+      jsargs.push(val);
+    });
+    return callable + ".fcall(" + jsargs.join(', ') + ")";
   }
 
   if (ty.is_symbol(input)) {
