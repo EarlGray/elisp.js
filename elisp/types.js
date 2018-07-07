@@ -330,7 +330,6 @@ LispSubr.prototype.to_jsstring = function () { return "subr.all['" + this.name +
 
 LispSubr.prototype.fcall = function(args, env) {
   let func = this.func.bind(env);
-  args = Array.prototype.map.call(args, from_js);
   let result = func.apply(func, args);
   return result;
 };

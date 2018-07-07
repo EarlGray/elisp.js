@@ -57,7 +57,8 @@ define_subr('-', [[ty.is_number], [], ty.is_number], function() {
 });
 
 define_subr('*', [[], [], ty.is_number], function() {
-  return Array.prototype.reduce.call(arguments, (acc, e) => acc * e.to_js(), 1);
+  let prod = Array.prototype.reduce.call(arguments, (acc, e) => acc * e.to_js(), 1);
+  return ty.integer(prod);
 });
 
 define_subr('<=', [[], [], ty.is_number], function() {
@@ -70,8 +71,8 @@ define_subr('<=', [[], [], ty.is_number], function() {
 /*
  *  Lists
  */
-define_subr('car', [[ty.is_list]], function(lst) { return lst.hd; });
-define_subr('cdr', [[ty.is_list]], function(lst) { return lst.tl; });
+define_subr('car', [[ty.is_list]], function(lst) { return lst.hd || ty.nil; });
+define_subr('cdr', [[ty.is_list]], function(lst) { return lst.tl || ty.nil; });
 
 /*
  *  environment

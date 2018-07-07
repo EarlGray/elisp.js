@@ -36,7 +36,7 @@ function eval_lisp(expr, env) {
     global[env.name] = saved_env;
   }
 
-  return ty.from_js(result);
+  return result;
 }
 
 function eval_text(input, env) {

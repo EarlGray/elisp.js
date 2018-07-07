@@ -29,7 +29,6 @@ Environment.prototype.fget = function(name) {
   let fun = this.fs[name] || subr.all[name];
   if (!fun)
     throw new ty.LispError("Symbol's function definition is void: " + name);
-  fun.env = this;
   return fun;
 }
 
