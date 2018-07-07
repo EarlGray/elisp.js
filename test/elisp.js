@@ -5,10 +5,8 @@ const assert = require('assert');
 const ty = require('elisp/types');
 const elisp = require('elisp/elisp');
 
-const Environment = require('elisp/environment').Environment;
 
-
-let env = new Environment();
+let env = new elisp.Environment();
 
 let assertEval = (input, output) => {
   let result = elisp.eval_text(input, env);
@@ -89,8 +87,6 @@ describe('special forms', () => {
   });
 
   describe('environment', () => {
-    let env = new Environment();
-
     describe('setq', () => {
       it("(setq x 12)",
           () => assertEval("(progn (setq x 12) x)", 12));
@@ -150,7 +146,6 @@ describe('special forms', () => {
     });
 
     describe('progn', () => {
-      let env = new Environment();
       it("should execute commands", () => {
         assertEval("(progn (setq x 1) (setq x (+ x 1)) (setq x (* x 2)) x)", 4);
       });

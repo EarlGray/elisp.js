@@ -12,11 +12,12 @@ function fcall(args, env) {
     throw new ty.LispError('Wrong number of arguments: ' + this.to_string() + ', ' + args.length);
   args.forEach((val, i) => { this.bindings[i+i+1] = val; });
 
-  this.func = translator.translate(this.body, env);
+  this.jscode = this.jscode || translator.translate(this.body, env);
+  this.func = this.func || eval(`(() => { return ${this.jscode} })`);
 
   try {
     env.push.apply(env, this.bindings);
-    var result = eval(this.func);
+    var result = this.func();
   } finally {
     env.pop.apply(env, this.args);
   }
@@ -52,3 +53,4 @@ exports.eval_text = eval_text;
 exports.eval_lisp = eval_lisp;
 
 exports.fcall = fcall;
+exports.Environment = Environment;
