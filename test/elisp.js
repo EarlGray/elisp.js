@@ -55,20 +55,20 @@ describe('environment', () => {
 });
 
 describe('types', () => {
-  xdescribe('booleanp', () => {
+  describe('booleanp', () => {
     it("should recognize t", () => assertEval("(booleanp t)", "t"));
     it("should recognize nil", () => assertEval("(booleanp nil)", "t"));
     it("should not recognize anything else", () => assertEval("(booleanp 0)", "nil"));
   });
 
-  xdescribe('subrp', () => {
+  describe('subrp', () => {
     it("should accept subrs", () => assertEval("(subrp (symbol-function '+))", "t"));
     it("should reject functions", () => assertEval("(subrp (lambda (x) x))", "nil"));
   });
-  xdescribe('functionp', () => {
+  describe('functionp', () => {
     it("should accept functions", () => assertEval("(functionp (symbol-function '+))", "t"));
     it("should accept functions", () => assertEval("(functionp (lambda (x) x))", "t"));
-    it("should reject others", () => {
+    xit("should reject others", () => {
       let code = `(progn
         (defmacro twice (fn x) \`(,f (,f ,x)))
         (functionp (symbol-function 'twice)))`;

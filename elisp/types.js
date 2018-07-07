@@ -293,6 +293,10 @@ function LispFun(args, body, interact, doc) {
 };
 LispFun.prototype = Object.create(LispObject.prototype);
 
+Object.defineProperty(LispFun.prototype,
+  'is_function', { value: true, writable: false }
+);
+
 LispFun.prototype.to_string = function() {
   let argl = consify(this.args.map((arg) => new LispSymbol(arg)));
   let body = this.body;
@@ -321,7 +325,7 @@ function LispSubr(name, args, func, doc) {
 LispSubr.prototype = Object.create(LispObject.prototype);
 
 Object.defineProperty(LispSubr.prototype,
-  'is_subr', { value: true, writable: false }
+  'is_function', { value: true, writable: false }
 );
 
 LispSubr.prototype.to_string = function() { return "#<subr " + this.name + ">"; }
@@ -383,10 +387,13 @@ exports.is_array = (obj) => obj.is_array;
 // Elisp->JS mapping is one-to-one:
 exports.is_string = (obj) => obj.__proto__ == LispString.prototype;
 exports.is_vector = (obj) => obj.__proto__ == LispVector.prototype;
+exports.is_subr = (obj) => obj.__proto__ == LispSubr.prototype;
 // many JS object types may be a symbol:
 exports.is_symbol = (obj) => obj.is_symbol;
+exports.is_function = (obj) => obj.is_function;
 
 exports.nil     = LispNil;
+exports.t       = new LispSymbol('t');
 exports.integer = (n) => new LispInteger(n);
 exports.symbol  = (s) => new LispSymbol(s);
 exports.list    = (arr) => consify(arr);
@@ -396,6 +403,7 @@ exports.lambda  = (argspec, body, interact, doc) => new LispFun(argspec, body, i
 
 exports.cons    = (h, t) => new LispCons(h, t);
 
+exports.bool    = (b) => (b ? exports.t : exports.nil);
 exports.from_js = from_js;
 
 /* errors */

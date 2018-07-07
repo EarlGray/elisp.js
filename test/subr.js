@@ -9,7 +9,7 @@ const eval_text = require('elisp/elisp').eval_text;
 
 describe('subr', () => {
   describe('+', () => {
-    it("+ is a subr",           () => assert.ok(subr.all['+'].is_subr));
+    it("+ is a subr",           () => assert.ok(ty.is_subr(subr.all['+'])));
 
     it("(+) == 0",              () => assert.equal(eval_text('(+)'), 0));
     it("(+ 2 2) == 4",          () => assert.equal(eval_text('(+ 2 2)'), 4));

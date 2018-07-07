@@ -25,6 +25,21 @@ function define_subr(name, args, func, doc) {
   subroutines_registry[name] = subr;
 };
 
+/*
+ *  types
+ */
+define_subr('subrp', [[ty.any]], function(expr) {
+  return ty.bool(ty.is_subr(expr));
+});
+
+define_subr('functionp', [[ty.any]], function(expr) {
+  return ty.bool(ty.is_function(expr));
+});
+
+define_subr('booleanp', [[ty.any]], function(expr) {
+  let val = ty.is_symbol(expr) && expr.to_string();
+  return ty.bool(val == 't' || val == 'nil');
+});
 
 /*
  *  introspection
