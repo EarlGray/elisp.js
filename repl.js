@@ -3,7 +3,7 @@ const process = require('process');
 
 const ty = require('elisp/types');
 const parser = require('elisp/parser');
-let translate = require('elisp/translator').translate;
+const translate = require('elisp/translate');
 
 const Environment = require('elisp/environment').Environment;
 var env = new Environment();
@@ -15,7 +15,7 @@ let replRawParser = (line) => parser.parseExpr(line);
 let replParser = (line) => parser.parseExpr(line).to_string();
 let replTranslator = (line) => {
   let expr = parser.parseExpr(line);
-  let jscode = translate(expr);
+  let jscode = translate.expr(expr);
   return jscode;
 };
 let replEvaluator = (line) => elisp.eval_text(line, env);

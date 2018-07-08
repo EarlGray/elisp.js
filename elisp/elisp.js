@@ -2,7 +2,7 @@
 
 const ty = require('elisp/types');
 const parser = require('elisp/parser');
-const translator = require('elisp/translator');
+const translate = require('elisp/translate');
 
 const Environment = require('elisp/environment').Environment;
 
@@ -10,12 +10,15 @@ function fcall(args, env) {
   /* `this` is LispFun, do not call otherwise */
   if (args.length != this.args.length)
     throw new ty.LispError('Wrong number of arguments: ' + this.to_string() + ', ' + args.length);
-  args.forEach((val, i) => { this.bindings[i+i+1] = val; });
 
-  this.jscode = this.jscode || translator.translate(this.body, env);
-  this.func = this.func || eval(`(() => { return ${this.jscode} })`);
+  if (!this.func) {
+    this.jscode = translate.lambda(this.args, this.body, env);
+    // console.error(`### .fcall() : ${this.jscode}`);
+    this.func = eval(this.jscode);
+  }
 
   try {
+    args.forEach((val, i) => { this.bindings[i+i+1] = val; });
     env.push.apply(env, this.bindings);
     var result = this.func();
   } finally {
@@ -31,7 +34,7 @@ function eval_lisp(expr, env) {
   let saved_env = global[env.name];
   try {
     global[env.name] = env;
-    let jscode = translator.translate(expr, env);
+    let jscode = translate.expr(expr, env);
     result = eval(jscode);
   } finally {
     global[env.name] = saved_env;

@@ -3,13 +3,28 @@
 const ty = require('elisp/types');
 const subr = require('elisp/subr');
 
+/*
+ *  Variables are handles to a value stack inside Environment
+ *    (to have less keyed lookups in hot code)
+ */
+function Variable(stack, is_fun) {
+  this.stack = stack;
+  this.is_fun = is_fun;
+}
+/* PERF TODO: compare to properties */
+Variable.prototype.get = function() { return this.stack[0]; }
+Variable.prototype.set = function(val) { this.stack[0] = val; return val; }
+
+/*
+ *  Lisp Environment:
+ */
 function Environment(name) {
   this.name = name || 'env';
 
   /* functions: name->LispFun */
   this.fs = {};
 
-  /* values */
+  /* values: name -> stack of values */
   this.vs = {};
 }
 
@@ -20,21 +35,41 @@ Environment.prototype.to_jsstring = function() {
 /*
  *  functions namespace
  */
+Environment.prototype.fun = function(name) {
+  let sub = subr.all[name];
+  if (sub) {
+    this.fs[name] = [sub];
+  }
+  return new Variable(this.fs[name], true);
+}
 Environment.prototype.fset = function(name, value) {
-  this.fs[name] = value;
+  if (this.fs[name] && this.fs[name].length) {
+    this.fs[name][0] = value;
+  } else {
+    this.fs[name] = [value];
+  }
   return value;
 }
 
 Environment.prototype.fget = function(name) {
-  let fun = this.fs[name] || subr.all[name];
-  if (!fun)
-    throw new ty.LispError("Symbol's function definition is void: " + name);
-  return fun;
+  let stack = this.fs[name];
+  if (stack && stack.length)
+    return stack[0];
+  let sub = subr.all[name];
+  if (sub) {
+    this.fs[name] = [sub];
+    return sub;
+  }
+  throw new ty.LispError("Symbol's function definition is void: " + name);
 }
 
 /*
  *  values namespace
  */
+Environment.prototype.var_ = function(name) {
+  return new Variable(this.vs[name]);
+}
+
 Environment.prototype.set = function() {
   let i = 0;
   let value;
@@ -86,7 +121,7 @@ Environment.prototype.is_bound = function(name) {
   return this.vs[name] && this.vs[name].length;
 };
 Environment.prototype.is_fbound = function(name) {
-  return this.fs[name];
+  return subr.all[name] || this.fs[name] && this.fs[name].length;
 };
 
 Environment.prototype.has_jsdebug = function() {

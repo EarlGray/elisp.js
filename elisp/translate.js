@@ -1,0 +1,371 @@
+'use strict';
+
+const ty = require('elisp/types');
+const Environment = require('elisp/environment').Environment;
+
+/*
+ *  Static contexts:
+ *  lexical variable scopes
+ */
+function Context(prev) {
+  this.prev = prev;
+  this.vars = {};
+
+  this.counter = prev ? prev.counter : 0;
+  this.jsvars = {};
+  this.is_fun = {};
+}
+
+Context.prototype.mangle = function(name) {
+  ++this.counter;
+  let jsname = 'v' + this.counter;
+  this.jsvars[jsname] = name;
+  return jsname;
+};
+Context.prototype.demangle = function(jsname) {
+  return this.jsvars[jsname];
+};
+
+Context.prototype.jsvar = function(name) {
+  let ctx = this;
+  while (ctx) {
+    if (name in this.vars)
+      return this.vars[name];
+    ctx = ctx.prev;
+  }
+  return null;
+}
+Context.prototype.has = function(name) {
+  return this.jsvar(name);
+}
+Context.prototype.addvar = function(name) {
+  let jsname;
+  if (jsname = this.has(name))
+    return jsname;
+
+  jsname = this.mangle(name)
+  this.vars[name] = jsname;
+  return jsname;
+}
+Context.prototype.addfun = function(name) {
+  this.is_fun[name] = true;
+  return this.addvar(name);
+}
+
+Context.prototype.to_jsstring = function(env) {
+  let jscode = [];
+  for (let v in this.vars) {
+    let jsvar = this.vars[v];
+    let getter = this.is_fun[v] ? 'fun' : 'var_';
+    jscode.push(`let ${jsvar} = ${env.to_jsstring()}.${getter}('${v}')`);
+  }
+  if (jscode.length)
+    jscode = jscode.join(";\n") + ";\n";
+  return jscode;
+}
+
+
+/*
+ *    Translation
+ */
+
+function translate_get(name, env, ctx) {
+  if (ctx) {
+    let jsname = ctx.addvar(name);
+    return `${jsname}.get()`;
+  }
+  return `${env.to_jsstring()}.get('${name}')`;
+}
+
+function translate_fget(name, env, ctx) {
+  if (ctx) {
+    let jsname = ctx.addfun(name);
+    return `${jsname}.get()`;
+  }
+  return `${env.to_jsstring()}.fget('${name}')`;
+}
+
+
+function translate_let(args, env, ctx) {
+  /* sanity checks */
+  if (args.is_false)
+    throw new ty.LispError('Wrong number of arguments: let', 0);
+  if (!ty.is_list(args))
+    throw new ty.LispError('Wrong type argument: listp, ' + args.to_jsstring());
+
+  let varlist = args.hd;
+  let body = args.tl;
+  if (!ty.is_list(body))
+    throw new ty.LispError('Wrong type argument: listp, ' + body.to_jsstring());
+
+  /* body preprocessing */
+  if (body.is_false)
+    body = ty.nil
+  else if (body.tl.is_false)
+    body = body.hd;
+  else
+    body = ty.cons(ty.symbol('progn'), body);
+
+  if (!ty.is_sequence(varlist))
+    throw new ty.LispError('Wrong type of argument: sequencep, 2');
+  if (varlist.is_false)
+    /* (let () <body>) */
+    return translate_expr(body, env, ctx);
+
+  let names = [];
+  let values = [];
+  let errors = [];
+  varlist.forEach((binding) => {
+    if (ty.is_symbol(binding)) {
+      names.push(binding);
+      values.push(ty.nil.to_jsstring());
+    } else if (ty.is_list(binding)) {
+      let name = binding.hd;
+      binding = binding.tl;
+      let jsval = translate_expr(binding.hd || ty.nil, env, ctx);
+      binding = binding.tl;
+      if (binding && !binding.is_false) {
+        let msg = "'let' bindings can have only one value-form: " + name.to_string();
+        errors.push(msg);
+      } else if (!ty.is_symbol(name)) {
+        errors.push("Wrong type argument: symbolp, " + name.to_string());
+      } else if (name.is_selfevaluating()) {
+        let msg = "Attempt to set a constant symbol: " + name.to_string();
+        errors.push(msg);
+      } else {
+        names.push(name);
+        values.push(jsval);
+      }
+    } else
+      errors.push('Wrong type argument: listp, ' + binding.to_string());
+  });
+
+  if (errors.length) {
+    return `(() => {
+      throw new ty.LispError("${errors[0]}");
+    })()`;
+  }
+
+  names = names.map((n) => "`" + n.to_string() + "`");
+  let bindings = [];
+  for (let i = 0; i < names.length; ++i) {
+    bindings.push(names[i]);
+    bindings.push(values[i]);
+  }
+
+  let ctx1 = new Context(ctx);
+  let jscode = body ? translate_expr(body, env, ctx1) : ty.nil.to_jsstring();
+  let jsctx = ctx1.to_jsstring(env);
+  return `(() => {
+    ${env.to_jsstring()}.push(${bindings.join(', ')});
+    ${jsctx} let result = ${jscode};
+    ${env.to_jsstring()}.pop(${names.join(', ')});
+    return result;
+  })()`;
+}
+
+function translate_lambda(args, env) {
+  let error = (msg, tag) => {
+    return `ty.lambda([], ty.list([ty.symbol('error'), ty.string('${msg}')]))`
+  };
+  if (args.is_false)
+    return error("Invalid function: (lambda)");
+  if (!ty.is_list(args))
+    return error('Wrong type argument: listp, 1');
+
+  let repr = ty.cons(ty.symbol('lambda'), args);
+  let body = args.tl || ty.nil;
+  let argv = args.hd || ty.nil;
+  if (!ty.is_list(argv))
+    return error(`Invalid function: ${repr.to_string()}`);
+
+  let argspec = argv.to_array();
+  if (argspec.find((arg) => !ty.is_symbol(arg)))
+    return error(`Invalid function: ${repr.to_string()}`);
+
+  if (body.is_false) {
+    // do nothing, it must evaluate to nil
+  } else if (body.tl.is_false) {
+    // single form, extract
+    body = body.hd;
+  } else {
+    // mutliple forms, prepend `progn`
+    body = ty.cons(ty.symbol('progn'), body);
+  }
+
+  argspec = argspec.map((arg) => "'" + arg.to_string() + "'");
+  argspec = '[' + argspec.join(', ') + ']';
+  return `ty.lambda(${argspec}, ${body.to_jsstring()})`;
+}
+
+let specials = {
+  'let': translate_let,
+  'lambda': translate_lambda,
+
+  'quote': function(args) {
+    if (args.is_false || !args.tl.is_false)
+      throw new ty.LispError('Wrong number of arguments: quote, ' + args.seqlen());
+
+    let what = args.hd;
+    return what.to_jsstring();
+  },
+
+  'setq': function(args, env, ctx) {
+    args = args.to_array();
+    if (args.length % 2)
+      throw new ty.LispError('Wrong number of arguments: setq, ' + args.length);
+
+    if (args.length == 2) {
+      let [name, value] = args;
+      if (!ty.is_symbol(name))
+        throw new ty.LispError('Wrong type argument: symbolp, ' + name.to_string());
+      if (name.is_selfevaluating())
+        throw new ty.LispError('Attempt to set a constant symbol: ' + name.to_string());
+
+      let jsval = translate_expr(value, env, ctx);
+
+      if (ctx) {
+        let jsvar = ctx.jsvar(name.to_string());
+        if (jsvar)
+          return `${jsvar}.set(${jsval})`;
+      }
+      return `${env.to_jsstring()}.set('${name.to_string()}', ${jsval})`;
+    }
+
+    let pairs = [];
+    let i = 0;
+    while (i < args.length) {
+      let name = args[i];
+      let value = args[i+1];
+      if (!ty.is_symbol(name))
+        throw new ty.LispError('Wrong type argument: symbolp, ' + name.to_string());
+      if (name.is_selfevaluating())
+        throw new ty.LispError('Attempt to set a constant symbol: ' + name.to_string());
+
+      let jsval = translate_expr(value, env, ctx);
+
+      pairs.push("'" + name.to_string() + "'");
+      pairs.push(jsval);
+
+      i += 2;
+    }
+    return env.to_jsstring() + ".set(" + pairs.join(", ") + ")";
+  },
+
+  'if': function(args, env, ctx) {
+    args = args.to_array();
+    if (args.length != 3)
+      throw new ty.LispError('Wrong number of arguments: if, ' + args.length);
+
+    let cond = translate_expr(args[0], env);
+    let thenb = translate_expr(args[1], env);
+    let elseb = translate_expr(args[2], env);
+
+    return '(!(' + cond + ').is_false ? (' + thenb + ') : (' + elseb + '))';
+  },
+
+  'progn': function(args, env, ctx) {
+    if (args.is_false)
+      return ty.nil.to_jsstring();
+    args = args.to_array();
+    let last = args.pop();
+
+    let stmts = [];
+    args.forEach((arg) => {
+      stmts.push(translate_expr(arg, env, ctx));
+    });
+    stmts.push('return ' + translate_expr(last, env, ctx) + ';\n');
+
+    return '(() => { ' + stmts.join(';\n') + '})()';
+  },
+
+  'while': function(args, env, ctx) {
+    if (args.is_false)
+      throw new ty.LispError("Wrong number of arguments: while, 0");
+    let condition = args.hd;
+    let body = args.tl;
+
+    condition = translate_expr(condition, env, ctx);
+    if (body.is_false) {
+      body = ''
+    } else if (body.tl.is_false) {
+      body = translate_expr(body.hd, env, ctx);
+    } else {
+      body = ty.cons(ty.symbol('progn'), body);
+      body = translate_expr(body, env, ctx);
+    }
+    return `(() => {
+      while (!${condition}.is_false) {
+        ${body}
+      };
+      return ty.nil;
+    })()`;
+  },
+
+};
+
+
+function translate_expr(input, env, ctx) {
+  if (input.is_false) {
+    return ty.nil.to_jsstring();
+  }
+  if (ty.is_list(input)) {
+    let hd = input.hd;
+    let args = input.tl;
+
+    let callable;
+    if (ty.is_symbol(hd)) {
+      let args = input.tl;
+      let sym = hd.to_string();
+
+      if (sym in specials)
+        return (specials[sym])(args, env, ctx);
+
+      callable = translate_fget(sym, env, ctx);
+    } else if (ty.is_list(hd)) {
+      callable = translate_expr(hd, env, ctx);
+    } else {
+      callable = `ty.subr('#<error>', [], (() => { throw new ty.LispError('Invalid function: ${hd.to_string()}'); }))`;
+    }
+
+    let jsenv = env.to_jsstring();
+    let jsargs = [];
+    args.forEach && args.forEach((item) => {
+      let val = translate_expr(item, env, ctx);
+      jsargs.push(val);
+    });
+    jsargs = '[' + jsargs.join(', ') + ']';
+
+    return callable + `.fcall(${jsargs}, ${jsenv})`;
+  }
+
+  if (ty.is_symbol(input)) {
+    if (input.is_selfevaluating())
+      return input.to_jsstring();
+    return translate_get(input.to_string(), env, ctx);
+  }
+  if (ty.is_atom(input)) {
+    return input.to_jsstring();
+  }
+  throw new ty.Error('Failed to translate: ' + input.to_string());
+};
+
+/*
+ *    Exports
+ */
+exports.expr = (input, env) => translate_expr(input, env || new Environment());
+
+/*
+exports.lambda = (args, body, env) => {
+  let jsbody = translate_expr(body, env);
+  return `(() => { return ${jsbody}; })`;
+};
+*/
+exports.lambda = (args, body, env) => {
+  let ctx = new Context();
+  let jsbody = translate_expr(body, env, ctx);
+  let jsctx = ctx.to_jsstring(env);
+  return `(() => {
+    ${jsctx} return ${jsbody};
+  })`;
+};

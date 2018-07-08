@@ -297,6 +297,9 @@ Object.defineProperty(LispFun.prototype,
   'is_function', { value: true, writable: false }
 );
 
+LispFun.prototype.to_js = function() { return this.func; };
+LispFun.prototype.to_jsstring = function() { return this.jscode || '#<thunk>'; };
+
 LispFun.prototype.to_string = function() {
   let argl = consify(this.args.map((arg) => new LispSymbol(arg)));
   let body = this.body;
@@ -400,6 +403,7 @@ exports.list    = (arr) => consify(arr);
 exports.vector  = (arr) => new LispVector(arr);
 exports.string  = (s) => new LispString(s);
 exports.lambda  = (argspec, body, interact, doc) => new LispFun(argspec, body, interact, doc);
+exports.subr    = (name, argspec, jscode) => new LispSubr(name, argspec, eval(jscode));
 
 exports.cons    = (h, t) => new LispCons(h, t);
 

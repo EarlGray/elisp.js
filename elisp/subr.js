@@ -3,7 +3,7 @@
 const util = require('util');
 
 const ty = require('elisp/types.js');
-const translator = require('elisp/translator.js');
+const translate = require('elisp/translate.js');
 
 let subroutines_registry = {};
 
@@ -53,14 +53,18 @@ define_subr('jsrepr', [[ty.any]], function(args) {
 
 define_subr('jscode', [[ty.any]],
 function(args) {
-  let jscode = translator.translate(args[0], this);
+  let arg = args[0];
+  if (ty.is_function(arg)) {
+    return ty.string(arg.to_jsstring());
+  }
+  let jscode = translate.expr(args[0], this);
   return ty.string(jscode);
 },
 { need_env: true });
 
 define_subr('jseval', [[ty.any]],
 function(args) {
-  return eval(args[0].to_js());
+  return ty.from_js(eval(args[0].to_js()));
 });
 
 /*
