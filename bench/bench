@@ -1,0 +1,30 @@
+#!/bin/bash
+
+mkdir -p tmp
+COMMIT=`git rev-parse --short HEAD`
+COMMIT1=`git rev-parse --short HEAD^`
+
+export NODE_PATH=.
+
+for f in bench/*.el ; do
+    f=`basename $f`
+    BENCHNAME=${f/.el/}
+    PROFLOG=tmp/$BENCHNAME-$COMMIT-isolate.log
+    TRACELOG=tmp/$BENCHNAME-$COMMIT-trace.log
+    PROFDATA=tmp/$BENCHNAME-$COMMIT-prof.log
+    echo $BENCHNAME
+
+    node --prof --trace-opt --trace-deopt --trace-ic repl.js < bench/$f > $TRACELOG
+    mv isolate-*-v8.log $PROFLOG
+    node --prof-process $PROFLOG > $PROFDATA
+
+    ##
+    TRACELOG1=$BENCHNAME-$COMMIT1-trace.log 
+    THIS_TIME=`tail -2 $TRACELOG | head -1`
+    echo "     now: $THIS_TIME"
+
+    test -x $TRACELOG1 && echo "  before: `tail -2 $TRACELOG1 | head -1`"
+
+    EMACS_TIME=`emacs -batch --script bench/$f 2>/dev/null | tail -1`
+    echo "   emacs: $EMACS_TIME"
+done
