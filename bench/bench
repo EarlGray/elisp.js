@@ -19,11 +19,11 @@ for f in bench/*.el ; do
     node --prof-process $PROFLOG > $PROFDATA
 
     ##
-    TRACELOG1=$BENCHNAME-$COMMIT1-trace.log 
     THIS_TIME=`tail -2 $TRACELOG | head -1`
     echo "     now: $THIS_TIME"
 
-    test -x $TRACELOG1 && echo "  before: `tail -2 $TRACELOG1 | head -1`"
+    TRACELOG1=tmp/$BENCHNAME-$COMMIT1-trace.log 
+    test -e $TRACELOG1 && echo "  before: `tail -2 $TRACELOG1 | head -1`"
 
     EMACS_TIME=`emacs -batch --script bench/$f 2>/dev/null | tail -1`
     echo "   emacs: $EMACS_TIME"
