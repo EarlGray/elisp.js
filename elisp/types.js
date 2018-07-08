@@ -315,10 +315,11 @@ LispFun.prototype.fcall = function(args, env) {
 /*
  *  native subroutine
  */
-function LispSubr(name, args, func, doc) {
+function LispSubr(name, args, func, attrs, doc) {
   this.name = name;
   this.args = args;
   this.func = func;
+  this.attrs = attrs;
   this.doc = doc;
 };
 
@@ -333,8 +334,7 @@ LispSubr.prototype.to_js = function() { return this.func; }
 LispSubr.prototype.to_jsstring = function () { return "subr.all['" + this.name + "']"; };
 
 LispSubr.prototype.fcall = function(args, env) {
-  let func = this.func.bind(env);
-  let result = func.apply(func, args);
+  let result = this.func.call(env, args);
   return result;
 };
 

@@ -19,24 +19,27 @@ let subroutines_registry = {};
  *    Validators can be custom: [[], [], (arg, num) => ...];
  */
 /* `func` : has the environment as `this` */
-function define_subr(name, args, func, doc) {
+function define_subr(name, args, func, attrs, doc) {
   /* TODO: make documentation database external */
-  let subr = new ty.LispSubr(name, args, func, doc);
+  let subr = new ty.LispSubr(name, args, func, attrs, doc);
   subroutines_registry[name] = subr;
 };
 
 /*
  *  types
  */
-define_subr('subrp', [[ty.any]], function(expr) {
+define_subr('subrp', [[ty.any]], function(args) {
+  let expr = args[0];
   return ty.bool(ty.is_subr(expr));
 });
 
-define_subr('functionp', [[ty.any]], function(expr) {
+define_subr('functionp', [[ty.any]], function(args) {
+  let expr = args[0];
   return ty.bool(ty.is_function(expr));
 });
 
-define_subr('booleanp', [[ty.any]], function(expr) {
+define_subr('booleanp', [[ty.any]], function(args) {
+  let expr = args[0];
   let val = ty.is_symbol(expr) && expr.to_string();
   return ty.bool(val == 't' || val == 'nil');
 });
@@ -44,76 +47,83 @@ define_subr('booleanp', [[ty.any]], function(expr) {
 /*
  *  introspection
  */
-define_subr('jsrepr', [[ty.any]], function(expr) {
-  return ty.string(util.inspect(expr));
+define_subr('jsrepr', [[ty.any]], function(args) {
+  return ty.string(util.inspect(args[0]));
 });
 
 define_subr('jscode', [[ty.any]],
-function(expr) {
-  let jscode = translator.translate(expr);
+function(args) {
+  let jscode = translator.translate(args[0], this);
   return ty.string(jscode);
-});
+},
+{ need_env: true });
 
 define_subr('jseval', [[ty.any]],
-function(expr) {
-  return eval(expr.to_js());
+function(args) {
+  return eval(args[0].to_js());
 });
 
 /*
  *  integer operations
  */
-define_subr('+', [[], [], ty.is_number], function() {
-  let sum = Array.prototype.reduce.call(arguments, (acc, e) => acc + e.to_js(), 0);
+define_subr('+', [[], [], ty.is_number], function(args) {
+  let sum = Array.prototype.reduce.call(args, (acc, e) => acc + e.to_js(), 0);
   return ty.integer(sum);
 });
-define_subr('-', [[ty.is_number], [], ty.is_number], function() {
-  let x = arguments[0].to_js();
-  return ty.integer(arguments[1] ? x - arguments[1].to_js() : -x);
+define_subr('-', [[ty.is_number], [], ty.is_number], function(args) {
+  let x = args[0].to_js();
+  return ty.integer(args[1] ? x - args[1].to_js() : -x);
 });
 
-define_subr('*', [[], [], ty.is_number], function() {
-  let prod = Array.prototype.reduce.call(arguments, (acc, e) => acc * e.to_js(), 1);
+define_subr('*', [[], [], ty.is_number], function(args) {
+  let prod = Array.prototype.reduce.call(args, (acc, e) => acc * e.to_js(), 1);
   return ty.integer(prod);
 });
 
-define_subr('<=', [[], [], ty.is_number], function() {
-  for (let i = 1; i < arguments.length; ++i)
-    if (arguments[i-1].to_js() > arguments[i].to_js())
+define_subr('<=', [[], [], ty.is_number], function(args) {
+  for (let i = 1; i < args.length; ++i)
+    if (args[i-1].to_js() > args[i].to_js())
       return ty.nil;
-  return ty.symbol('t');
+  return ty.t;
 });
 
 /*
  *  Lists
  */
-define_subr('car', [[ty.is_list]], function(lst) { return lst.hd || ty.nil; });
-define_subr('cdr', [[ty.is_list]], function(lst) { return lst.tl || ty.nil; });
+define_subr('car', [[ty.is_list]], function(args) { return args[0].hd || ty.nil; });
+define_subr('cdr', [[ty.is_list]], function(args) { return args[0].tl || ty.nil; });
 
 /*
  *  environment
  */
 define_subr('fset', [[ty.is_symbol, ty.any]],
-function(sym, val) {
+function(args) {
+  let [sym, val] = args;
   return this.fset(sym.to_string(), val);
-});
+},
+{ need_env: true });
 
 define_subr('symbol-function', [[ty.is_symbol]],
-function(sym) {
+function(args) {
+  let sym = args[0];
   return this.fget(sym.to_string());
-});
+},
+{ need_env: true });
 
 /*
  *  Errors
  */
 define_subr('error', [[ty.is_symbol, ty.is_string]],
-function(tag, message) {
+function(args) {
+  let [tag, message] = args;
   throw new ty.LispError(message.to_js());
 });
 
 /*
  *  Utils
  */
-define_subr('print', [[ty.any]], function(expr) {
+define_subr('print', [[ty.any]], function(args) {
+  let expr = args[0];
   console.log(expr.to_string());
   return expr;
 });
