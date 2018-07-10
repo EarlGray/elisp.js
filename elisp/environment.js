@@ -7,13 +7,21 @@ const subr = require('elisp/subr');
  *  Variables are handles to a value stack inside Environment
  *    (to have less keyed lookups in hot code)
  */
-function Variable(stack, is_fun) {
+function Variable(name, stack, is_fun) {
+  this.name = name;
   this.stack = stack;
   this.is_fun = is_fun;
 }
 /* PERF TODO: compare to properties */
-Variable.prototype.get = function() { return this.stack[0]; }
-Variable.prototype.set = function(val) { this.stack[0] = val; return val; }
+Variable.prototype.get = function() {
+  if (this.stack.length)
+    return this.stack[0];
+  throw new ty.LispError("Symbol's value as variable is void: " + this.name);
+};
+Variable.prototype.set = function(val) {
+  this.stack[0] = val;
+  return val;
+};
 
 /*
  *  Lisp Environment:
@@ -36,17 +44,24 @@ Environment.prototype.to_jsstring = function() {
  *  functions namespace
  */
 Environment.prototype.fun = function(name) {
-  let sub = subr.all[name];
-  if (sub) {
-    this.fs[name] = [sub];
+  let stack = this.fs[name];
+  if (stack === undefined) {
+    stack = [];
+    this.fs[name] = stack;
+
+    let sub = subr.all[name];
+    if (sub)
+      stack.push(sub);
   }
-  return new Variable(this.fs[name], true);
+  return new Variable(name, stack, true);
 }
+
 Environment.prototype.fset = function(name, value) {
-  if (this.fs[name] && this.fs[name].length) {
-    this.fs[name][0] = value;
-  } else {
+  let stack = this.fs[name];
+  if (stack === undefined) {
     this.fs[name] = [value];
+  } else {
+    stack[0] = value;
   }
   return value;
 }
@@ -67,46 +82,51 @@ Environment.prototype.fget = function(name) {
  *  values namespace
  */
 Environment.prototype.var_ = function(name) {
-  return new Variable(this.vs[name]);
+  let stack = this.vs[name];
+  if (stack === undefined) {
+    stack = [];
+    this.vs[name] = stack;
+  }
+  return new Variable(name, stack);
 }
 
 Environment.prototype.set = function() {
-  let i = 0;
   let value;
-  while (i < arguments.length) {
+  for (let i = 0; i < arguments.length; i += 2) {
     let name = arguments[i];
     value = arguments[i+1];
 
-    if (this.vs[name] && this.vs[name].length) {
-      this.vs[name][0] = value;
-    } else {
+    let stack = this.vs[name];
+    if (stack === undefined) {
+      /* should this happen? */
       this.vs[name] = [value];
+    } else if (stack.length) {
+      stack[0] = value;
+    } else {
+      stack.push(value);
     }
-
-    i += 2;
   }
   return value;
 };
 
 Environment.prototype.get = function(name) {
-  if (this.vs[name])
-    return this.vs[name][0];
+  let stack = this.vs[name];
+  if (stack && stack.length)
+    return stack[0];
   throw new ty.LispError("Symbol's value as variable is void: " + name);
 };
 
 Environment.prototype.push = function() {
-  let i = 0;
-  while (i < arguments.length) {
+  for (let i = 0; i < arguments.length; i += 2) {
     let name = arguments[i];
     let value = arguments[i+1];
 
-    if (this.vs[name] && this.vs[name].length) {
-      this.vs[name].unshift(value);
-    } else {
+    let stack = this.vs[name];
+    if (stack === undefined) {
       this.vs[name] = [value];
+    } else {
+      stack.unshift(value);
     }
-
-    i += 2;
   }
 };
 
@@ -118,10 +138,12 @@ Environment.prototype.pop = function() {
 };
 
 Environment.prototype.is_bound = function(name) {
-  return this.vs[name] && this.vs[name].length;
+  let stack = this.vs[name];
+  return stack && stack.length;
 };
 Environment.prototype.is_fbound = function(name) {
-  return subr.all[name] || this.fs[name] && this.fs[name].length;
+  let stack = this.fs[name];
+  return subr.all[name] || (stack && stack.length);
 };
 
 Environment.prototype.has_jsdebug = function() {

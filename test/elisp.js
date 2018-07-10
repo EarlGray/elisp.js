@@ -22,6 +22,9 @@ describe('environment', () => {
   describe('global variables', () => {
     it("should set it",     () => assertEval("(progn (setq x 42) x)", 42));
     it("should re-set it",  () => assertEval("(progn (setq x :ignore) (setq x 42) x)", 42));
+
+    it("should throw if absent",        () => assertThrows("doesnotexist"));
+    it("should throw if absent in let", () => assertThrows("(let () doesnotexist)"));
   });
 
  describe('local variables', () => {

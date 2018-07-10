@@ -71,10 +71,15 @@ function(args) {
  *  integer operations
  */
 define_subr('+', [[], [], ty.is_number], function(args) {
-  if (args.length == 2)
-    return ty.integer(args[0].to_js() + args[0].to_js());
-  let sum = Array.prototype.reduce.call(args, (acc, e) => acc + e.to_js(), 0);
-  return ty.integer(sum);
+  try {
+    if (args.length == 2)
+      return ty.integer(args[0].to_js() + args[1].to_js());
+    let sum = Array.prototype.reduce.call(args, (acc, e) => acc + e.to_js(), 0);
+    return ty.integer(sum);
+  } catch (e) {
+    if (e instanceof TypeError)
+      throw new ty.LispError('Wrong type argument: numberp');
+  }
 });
 define_subr('-', [[ty.is_number], [], ty.is_number], function(args) {
   let x = args[0].to_js();
