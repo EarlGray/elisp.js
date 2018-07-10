@@ -7,49 +7,70 @@ const Environment = require('elisp/environment').Environment;
  *  Static contexts:
  *  lexical variable scopes
  */
-function Context(prev) {
+function Context(prev, bound) {
   this.prev = prev;
+
   this.vars = {};
+
+  this.freefuns = {};
+  this.freevars = {};
+  this.bound = {};
+  bound.forEach((v) => { this.bound[v] = true; });
 
   this.counter = prev ? prev.counter : 0;
   this.jsvars = {};
+
   this.is_fun = {};
 }
 
-Context.prototype.mangle = function(name) {
-  ++this.counter;
-  let jsname = 'v' + this.counter;
-  this.jsvars[jsname] = name;
-  return jsname;
-};
-Context.prototype.demangle = function(jsname) {
-  return this.jsvars[jsname];
-};
-
 Context.prototype.jsvar = function(name) {
-  let ctx = this;
-  while (ctx) {
-    if (name in this.vars)
-      return this.vars[name];
-    ctx = ctx.prev;
+  /* walks all contexts, returns the js variable for name or null */
+  for (let ctx = this; ctx; ctx = ctx.prev) {
+    if (name in ctx.vars)
+      return ctx.vars[name];
   }
   return null;
 }
-Context.prototype.has = function(name) {
-  return this.jsvar(name);
-}
-Context.prototype.addvar = function(name) {
+
+Context.prototype.addvar = function(name, is_fun) {
+  /* gets an existing js variable or creates new */
   let jsname;
-  if (jsname = this.has(name))
+  if (jsname = this.jsvar(name))
     return jsname;
 
-  jsname = this.mangle(name)
+  ++this.counter;
+  jsname = (is_fun ? 'v' : 'f') + this.counter;
+
+  /* if it's a free variable, save it */
+  this.checkFree(name, is_fun);
+
   this.vars[name] = jsname;
+  this.jsvars[jsname] = name;
+
+  if (is_fun)
+    this.is_fun[name] = true;
   return jsname;
 }
 Context.prototype.addfun = function(name) {
-  this.is_fun[name] = true;
-  return this.addvar(name);
+  return this.addvar(name, true);
+}
+
+Context.prototype.checkFree = function(name, is_fun) {
+  /*
+   * check if the name is bound;
+   * otherwise save it as free in the outermost context
+   */
+  for (let ctx = this; ctx; ctx = ctx.prev) {
+    if (name in ctx.bound)
+      return false;
+    if (!ctx.prev) {
+      if (is_fun)
+        ctx.freefuns[name] = true;
+      else
+        ctx.freevars[name] = true;
+      return true;
+    }
+  }
 }
 
 Context.prototype.to_jsstring = function(env) {
@@ -85,6 +106,16 @@ function translate_fget(name, env, ctx) {
   return `${env.to_jsstring()}.fget('${name}')`;
 }
 
+function get_argspec(args) {
+  let argspec = [];
+  //console.error('### get_argspec: args = ' + args.to_string());
+  args.forEach((arg) => {
+    if (!ty.is_symbol(arg))
+      throw new ty.LispError('Wrong type argument: symbolp, ' + arg.to_string());
+    argspec.push(arg.to_string());
+  });
+  return argspec;
+}
 
 function translate_let(args, env, ctx) {
   /* sanity checks */
@@ -117,7 +148,7 @@ function translate_let(args, env, ctx) {
   let errors = [];
   varlist.forEach((binding) => {
     if (ty.is_symbol(binding)) {
-      names.push(binding);
+      names.push(binding.to_string());
       values.push(ty.nil.to_jsstring());
     } else if (ty.is_list(binding)) {
       let name = binding.hd;
@@ -133,7 +164,7 @@ function translate_let(args, env, ctx) {
         let msg = "Attempt to set a constant symbol: " + name.to_string();
         errors.push(msg);
       } else {
-        names.push(name);
+        names.push(name.to_string());
         values.push(jsval);
       }
     } else
@@ -146,20 +177,23 @@ function translate_let(args, env, ctx) {
     })()`;
   }
 
-  names = names.map((n) => "`" + n.to_string() + "`");
   let bindings = [];
   for (let i = 0; i < names.length; ++i) {
-    bindings.push(names[i]);
+    bindings.push("`" + names[i] + "`");
     bindings.push(values[i]);
   }
+  bindings = bindings.join(', ');
 
-  let ctx1 = new Context(ctx);
+  let ctx1 = new Context(ctx, names);
   let jscode = body ? translate_expr(body, env, ctx1) : ty.nil.to_jsstring();
   let jsctx = ctx1.to_jsstring(env);
+
+  let jsenv = env.to_jsstring();
+  let jsnames = names.map((n) => '`'+n+'`').join(', ');
   return `(() => {
-    ${env.to_jsstring()}.push(${bindings.join(', ')});
+    ${jsenv}.push(${bindings});
     ${jsctx} let result = ${jscode};
-    ${env.to_jsstring()}.pop(${names.join(', ')});
+    ${jsenv}.pop(${jsnames});
     return result;
   })()`;
 }
@@ -179,9 +213,14 @@ function translate_lambda(args, env) {
   if (!ty.is_list(argv))
     return error(`Invalid function: ${repr.to_string()}`);
 
-  let argspec = argv.to_array();
-  if (argspec.find((arg) => !ty.is_symbol(arg)))
+  let argspec;
+  try {
+    argspec = get_argspec(argv);
+  } catch (e) {
     return error(`Invalid function: ${repr.to_string()}`);
+  }
+  argspec = argspec.map((arg) => '`' + arg + '`');
+  argspec = '[' + argspec.join(', ') + ']';
 
   if (body.is_false) {
     // do nothing, it must evaluate to nil
@@ -193,8 +232,6 @@ function translate_lambda(args, env) {
     body = ty.cons(ty.symbol('progn'), body);
   }
 
-  argspec = argspec.map((arg) => "'" + arg.to_string() + "'");
-  argspec = '[' + argspec.join(', ') + ']';
   return `ty.lambda(${argspec}, ${body.to_jsstring()})`;
 }
 
@@ -221,33 +258,34 @@ let specials = {
         throw new ty.LispError('Wrong type argument: symbolp, ' + name.to_string());
       if (name.is_selfevaluating())
         throw new ty.LispError('Attempt to set a constant symbol: ' + name.to_string());
-
-      let jsval = translate_expr(value, env, ctx);
+      name = name.to_string();
 
       if (ctx) {
-        let jsvar = ctx.jsvar(name.to_string());
-        if (jsvar)
-          return `${jsvar}.set(${jsval})`;
+        let jsvar = ctx.addvar(name);
+        let jsval = translate_expr(value, env, ctx);
+        return `${jsvar}.set(${jsval})`;
       }
-      return `${env.to_jsstring()}.set('${name.to_string()}', ${jsval})`;
+      let jsval = translate_expr(value, env, ctx);
+      return `${env.to_jsstring()}.set('${name}', ${jsval})`;
     }
 
     let pairs = [];
-    let i = 0;
-    while (i < args.length) {
+    for (let i = 0; i < args.length; i += 2) {
       let name = args[i];
       let value = args[i+1];
+
       if (!ty.is_symbol(name))
         throw new ty.LispError('Wrong type argument: symbolp, ' + name.to_string());
       if (name.is_selfevaluating())
         throw new ty.LispError('Attempt to set a constant symbol: ' + name.to_string());
+      name = name.to_string();
+
+      if (ctx) ctx.checkFree(name);
 
       let jsval = translate_expr(value, env, ctx);
 
-      pairs.push("'" + name.to_string() + "'");
+      pairs.push("'" + name + "'");
       pairs.push(jsval);
-
-      i += 2;
     }
     return env.to_jsstring() + ".set(" + pairs.join(", ") + ")";
   },
@@ -362,10 +400,17 @@ exports.lambda = (args, body, env) => {
 };
 */
 exports.lambda = (args, body, env) => {
-  let ctx = new Context();
+  let ctx = new Context(null, args);
+
   let jsbody = translate_expr(body, env, ctx);
   let jsctx = ctx.to_jsstring(env);
-  return `(() => {
-    ${jsctx} return ${jsbody};
-  })`;
+
+  /*
+  let freevars = Object.keys(ctx.freevars);
+  let freefuns = Object.keys(ctx.freefuns);
+  console.error('### lambda: freefuns = ' + freefuns.join(','));
+  console.error('### lambda: freevars = ' + freevars.join(','));
+  */
+
+  return `(() => { ${jsctx} return ${jsbody}; })`;
 };

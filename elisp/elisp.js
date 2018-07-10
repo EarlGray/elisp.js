@@ -13,7 +13,7 @@ function fcall(args, env) {
 
   if (!this.func) {
     this.jscode = translate.lambda(this.args, this.body, env);
-    // console.error(`### .fcall() : ${this.jscode}`);
+    // console.error(`### fcall : ${this.jscode}`);
     this.func = eval(this.jscode);
   }
 

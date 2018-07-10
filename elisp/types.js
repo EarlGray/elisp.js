@@ -88,6 +88,7 @@ Object.defineProperty(NilClass.prototype, 'is_symbol', { value: true, writable: 
 
 // ...even a sequence!
 NilClass.prototype.seqlen = () => 0;
+NilClass.prototype.forEach = () => null;
 Object.defineProperty(NilClass.prototype, 'is_seq', { value: true, writable: false });
 Object.defineProperty(NilClass.prototype, 'is_list', { value: true, writable: false });
 
@@ -113,12 +114,10 @@ Object.defineProperty(LispCons.prototype,
 );
 
 LispCons.prototype.forEach = function(callback) {
-  let cur = this;
-  while (cur != LispNil) {
+  for (let cur = this; cur != LispNil; cur = cur.tl) {
     callback(cur.hd);
     if (!cur.tl.is_list)
       throw new LispError('LispCons.forEach: not a regular list');
-    cur = cur.tl;
   }
 };
 
