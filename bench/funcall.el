@@ -1,1 +1,1 @@
-(progn (fset 'sqr (lambda (x) (* x x))) (fset 'sum-sqr (lambda (n) (let ((sum 0)) (while (<= 0 (setq n (- n 1))) (setq sum (+ sum (sqr n)))) sum))) (let ((t1 (float-time))) (print (sum-sqr 100000)) (print (- (float-time) t1))))
+(progn (fset 'sqr (lambda (x) (* x x))) (fset 'sum-sqr (lambda (n) (let ((sum 0)) (while (<= 0 (setq n (- n 1))) (setq sum (+ sum (sqr n)))) sum))) (let ((t1 (float-time))) (print (sum-sqr 1000000)) (print (- (float-time) t1))))
