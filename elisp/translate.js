@@ -39,7 +39,7 @@ Context.prototype.addvar = function(name, is_fun) {
     return jsname;
 
   ++this.counter;
-  jsname = (is_fun ? 'v' : 'f') + this.counter;
+  jsname = (is_fun ? 'f' : 'v') + this.counter;
 
   /* if it's a free variable, save it */
   this.checkFree(name, is_fun);
