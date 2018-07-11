@@ -2,8 +2,8 @@
 
 const util = require('util');
 
-const ty = require('elisp/types.js');
-const translate = require('elisp/translate.js');
+const ty = require('./types.js');
+const translate = require('./translate.js');
 
 let subroutines_registry = {};
 

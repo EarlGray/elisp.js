@@ -2,7 +2,7 @@
   "name": "elisp",
   "version": "0.0.1",
   "description": "elisp to javascript translator",
-  "main": "index.js",
+  "main": "elisp/elisp.js",
   "scripts": {
     "repl": "NODE_PATH=. node repl.js",
     "test": "NODE_PATH=. node_modules/mocha/bin/mocha",
@@ -16,7 +16,11 @@
   "author": "Dmytro Sirenko",
   "license": "MIT",
   "dependencies": {
-    "mocha": "^5.2.0",
     "parsimmon": "^1.10.0"
+  },
+  "devDependencies": {
+    "mocha": "^5.2.0",
+    "webpack": "^4.16.0",
+    "webpack-cli": "^3.0.8"
   }
 }

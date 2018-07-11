@@ -1,6 +1,6 @@
 'use strict';
 
-let ty = require('elisp/types.js');
+let ty = require('./types.js');
 let P = require('parsimmon');
 
 /*

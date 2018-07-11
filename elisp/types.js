@@ -310,7 +310,7 @@ LispFun.prototype.to_string = function() {
 };
 
 LispFun.prototype.fcall = function(args, env) {
-  LispFun.fcall = LispFun.fcall || require('elisp/elisp').fcall;
+  LispFun.fcall = LispFun.fcall || require('./elisp').fcall;
   return LispFun.fcall.call(this, args, env);
 };
 

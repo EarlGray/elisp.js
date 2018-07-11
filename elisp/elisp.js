@@ -1,10 +1,10 @@
 'use strict';
 
-const ty = require('elisp/types');
-const parser = require('elisp/parser');
-const translate = require('elisp/translate');
+const ty = require('./types.js');
+const parser = require('./parser');
+const translate = require('./translate');
 
-const Environment = require('elisp/environment').Environment;
+const Environment = require('./environment').Environment;
 
 function fcall(args, env) {
   /* `this` is LispFun, do not call otherwise */

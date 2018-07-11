@@ -1,7 +1,7 @@
 'use strict';
 
-const ty = require('elisp/types');
-const subr = require('elisp/subr');
+const ty = require('./types');
+const subr = require('./subr');
 
 /*
  *  Variables are handles to a value stack inside Environment

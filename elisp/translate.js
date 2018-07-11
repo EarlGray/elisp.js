@@ -1,7 +1,7 @@
 'use strict';
 
-const ty = require('elisp/types');
-const Environment = require('elisp/environment').Environment;
+const ty = require('./types');
+const Environment = require('./environment').Environment;
 
 /*
  *  Static contexts:
