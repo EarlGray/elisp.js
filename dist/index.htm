@@ -1,17 +1,22 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
 <title>elisp.js demo</title>
 <style>
 #code #output #error { font-family: monospace; font-size: 12pt; }
 #error { color: red }
-#code { border-right: 0.5em solid gray; }
+#code {
+  width: 50em; height: 10em;
+  max-width: 95%; max-height: 30%;
+  border-right: 0.5em solid gray;
+}
 </style>
 </head>
 <body>
   <h1>elisp.js</h1>
   <hr>
-  <textarea id='code' type='text' cols='80' rows='25' autofocus spellcheck='false'/>
+  <textarea id='code' type='text' autofocus spellcheck='false'/>
   </textarea>
   <div id='output'></div>
   <div id='error'></div>

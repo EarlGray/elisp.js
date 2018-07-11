@@ -26,14 +26,14 @@ stdin.oninput = function () {
 
   try {
     let result = elisp.eval_lisp(expr, env);
-    stdout.innerText = result.to_string();
-    stderr.innerText = '';
     stdin.style['border-right'] = '0.5em solid green';
+    stderr.innerText = '';
+    stdout.innerHTML = result.to_string();
   } catch (e) {
     if (e instanceof ty.LispError) {
-      stdout.innerText = '';
-      stderr.innerText = e.message;
       stdin.style['border-right'] = '0.5em solid gray';
+      stdout.innerText = '';
+      stderr.innerHTML = e.message;
     } else {
       stdin.style['border-right'] = '0.5em solid red';
       console.error(e);
