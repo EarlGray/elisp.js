@@ -71,27 +71,30 @@ function(args) {
  *  integer operations
  */
 define_subr('+', [[], [], ty.is_number], function(args) {
-  try {
-    if (args.length == 2)
-      return ty.integer(args[0].to_js() + args[1].to_js());
-    let sum = Array.prototype.reduce.call(args, (acc, e) => acc + e.to_js(), 0);
-    return ty.integer(sum);
-  } catch (e) {
-    if (e instanceof TypeError)
-      throw new ty.LispError('Wrong type argument: numberp');
-  }
+  if (args.length == 2)
+    return ty.integer(args[0].to_js() + args[1].to_js());
+  let sum = 0;
+  for (let i = 0; i < args.length; ++i)
+    sum += args[i].to_js();
+  return ty.integer(sum);
 });
 define_subr('-', [[ty.is_number], [], ty.is_number], function(args) {
-  let x = args[0].to_js();
-  return ty.integer(args[1] ? x - args[1].to_js() : -x);
+  let x = args[0].num;
+  return ty.integer(args[1] ? x - args[1].num : -x);
 });
 
 define_subr('*', [[], [], ty.is_number], function(args) {
-  let prod = Array.prototype.reduce.call(args, (acc, e) => acc * e.to_js(), 1);
+  if (args.length == 2)
+    return ty.integer(args[0].to_js() * args[1].to_js());
+  let prod = 1;
+  for (let i = 0; i < args.length; ++i)
+    prod *= args[i].to_js();
   return ty.integer(prod);
 });
 
 define_subr('<=', [[], [], ty.is_number], function(args) {
+  if (args.length == 2)
+    return ty.bool(args[0].to_js() <= args[1].to_js());
   for (let i = 1; i < args.length; ++i)
     if (args[i-1].to_js() > args[i].to_js())
       return ty.nil;

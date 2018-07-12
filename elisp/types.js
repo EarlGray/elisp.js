@@ -336,8 +336,15 @@ LispSubr.prototype.to_js = function() { return this.func; }
 LispSubr.prototype.to_jsstring = function () { return "subr.all['" + this.name + "']"; };
 
 LispSubr.prototype.fcall = function(args, env) {
-  let result = this.func.call(env, args);
-  return result;
+  try {
+    let result = this.func.call(env, args);
+    return result;
+  } catch (e) {
+    if (e instanceof TypeError)
+      throw new LispError('Wrong type argument: numberp');
+    else
+      throw e;
+  }
 };
 
 /*
