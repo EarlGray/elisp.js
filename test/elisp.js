@@ -228,12 +228,24 @@ describe('macros', () => {
     assertEval(code, 16);
   });
 
-  xit("let macro", () => {
-    let code = `
-      (let ((x 4)
-            (inc '(macro lambda (v) (list 'setq v (list '+ v 1)))))
-        (inc x)
-        x) `;
-    assertEval(code, 5);
+  xit("macroexpand: macro before defun", () => {
+    let code = `(progn
+      (fset 'macro1 '(macro lambda () :before))
+      (fset 'test (lambda () (macro1)))
+      (fset 'macro1 '(macro lambda () :after))
+      (test1)
+    )`;
+    assertEval(code, ":before");
+  });
+
+  xit("macroexpand: macro after defun", () => {
+    let code = `(progn
+      (fset 'test (lambda () (macro1)))
+      (fset 'macro1 '(macro lambda () :after1))
+      (let ((ret1 (test)))
+         (fset 'macro1 '(macro lambda () :after2))
+         (cons ret1 (test)))
+    )`;
+    assertEval(code, "(:after1 . :after2)");
   });
 });

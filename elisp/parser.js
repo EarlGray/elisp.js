@@ -130,14 +130,14 @@ let Lisp = P.createLanguage({
       r.Vector,
       r.Integer,
       r.Symbol
-    )
+    ).wrap(optWhitespace, optWhitespace)
     .desc("expression");
   },
 
   List: (r) => {
     let open = P.string('(').then(optWhitespace);
     let close = optWhitespace.then(P.string(')'));
-    return r.Expression.sepBy(whitespace)
+    return r.Expression.many()
       .wrap(open, close)
       .map(ty.list)
       .desc("list/pair");

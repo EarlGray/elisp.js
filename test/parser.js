@@ -139,6 +139,14 @@ describe('parser', () => {
       let lc = ty.list([ty.symbol('`'), lc1]);
       assertEquals(lp, lc);
     });
+
+    xit("#'(lambda (x) x)", () => {
+      let x = ty.symbol('x');
+      let lambda = ty.symbol('lambda');
+      let fun = ty.list([lambda, ty.list([x]), x]);
+      let funq = ty.list([ty.symbol('function'), fun]);
+      assertEquals("#'(lambda (x) x)", funq);
+    });
   });
 
   describe('.parseList', () => {
@@ -182,10 +190,13 @@ describe('parser', () => {
     it("should parse nil as nil", () => assertEquals(parse("nil"), nil));
   });
 
-  xdescribe('comment', () => {
-    it("should trim _whitespace", () => assertEquals(parser.read(' foo'), foo));
-    it("should trim whitespace_", () => assertEquals(parser.read('foo '), foo));
-    it("should trim _whitespace_", () => assertEquals(parser.read(' foo '), foo));
+  describe('comment', () => {
+    it("should trim _whitespace",
+        () => assertEquals(parser.read(' foo'), foo));
+    it("should trim whitespace_",
+        () => assertEquals(parser.read('foo '), foo));
+    it("should trim _whitespace_",
+        () => assertEquals(parser.read(' foo '), foo));
     it("should trim comments", () => {
       let lp = parser.read("wtf  ;; whiskey tango foxtrot");
       assertEquals(lp, ty.symbol('wtf'));
