@@ -78,6 +78,12 @@ describe('types', () => {
       assertEval(code, "nil");
     });
   });
+
+  describe('listp', () => {
+    it("nil is list", () => assertEval("(listp nil)", "t"));
+    it("(1 . 2) is list", () => assertEval("(listp (cons 1 2))", "t"));
+    it("(listp (lambda (x) x))",  () => assertEval("(listp (lambda (x) x))", "t")); // yep!
+  });
 });
 
 
@@ -186,17 +192,24 @@ describe('functions', () => {
   });
 
   describe('arguments', () => {
-    it("should take no arguments", () => assertEval("((lambda ()))", "nil"));
-    it("should take one argument", () => assertEval("((lambda (x) x) 42)", 42));
-    it("should take two arguments", () => assertEval("((lambda (x y) (+ x y)) 2 2)", 4));
+    it("should take no arguments",
+        () => assertEval("((lambda ()))", "nil"));
+    it("should take one argument",
+        () => assertEval("((lambda (x) x) 42)", 42));
+    it("should take two arguments",
+        () => assertEval("((lambda (x y) (+ x y)) 2 2)", 4));
 
     it("should take symbols only",
         () => assertThrows("((lambda (1) 1) 1)", "Invalid function: (lambda (1) 1)"));
   });
 
   xdescribe('defun', () => {
-    it("(defun sqr (x) (* x x))",
-        () => assertEval("(progn (defun sqr (x) (* x x)) (let ((x 12)) (sqr x)))", 144));
+    it("(defun sqr (x) (* x x))", () => {
+      let code = `(progn
+        (defun sqr (x) (* x x))
+        (let ((x 12)) (sqr x)))`;
+      assertEval(code, 144);
+    });
   });
 
   xdescribe('funcall/apply', () => {
@@ -206,10 +219,21 @@ describe('functions', () => {
 });
 
 
-xdescribe('macros', () => {
-  it("fset's macro", () => {
-    let _fset = "(fset 'twice '(macro lambda (fn arg) `(,fn (,fn ,arg))))";
-    let _sqr =  "(fset 'sqr (lambda (x) (* x x)))";
-    assertEval(`(progn ${_fset} ${_sqr} (twice sqr 2))`, 16);
+describe('macros', () => {
+  xit("fset's macro", () => {
+    let code = `(progn
+      (fset 'twice '(macro lambda (fn arg) (list fn (list fn arg))))
+      (fset 'sqr (lambda (x) (* x x)))
+      (twice sqr 2))`;
+    assertEval(code, 16);
+  });
+
+  xit("let macro", () => {
+    let code = `
+      (let ((x 4)
+            (inc '(macro lambda (v) (list 'setq v (list '+ v 1)))))
+        (inc x)
+        x) `;
+    assertEval(code, 5);
   });
 });

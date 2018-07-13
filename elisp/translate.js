@@ -368,7 +368,7 @@ function translate_expr(input, env, ctx) {
 
     let jsenv = env.to_jsstring();
     let jsargs = [];
-    args.forEach && args.forEach((item) => {
+    args.forEach((item) => {
       let val = translate_expr(item, env, ctx);
       jsargs.push(val);
     });
@@ -385,20 +385,17 @@ function translate_expr(input, env, ctx) {
   if (ty.is_atom(input)) {
     return input.to_jsstring();
   }
-  throw new ty.Error('Failed to translate: ' + input.to_string());
+  throw new Error('Failed to translate: ' + input.to_string());
 };
 
 /*
  *    Exports
  */
-exports.expr = (input, env) => translate_expr(input, env || new Environment());
-
-/*
-exports.lambda = (args, body, env) => {
-  let jsbody = translate_expr(body, env);
-  return `(() => { return ${jsbody}; })`;
+exports.expr = (input, env) => {
+  env = env || new Environment();
+  return translate_expr(input, env);
 };
-*/
+
 exports.lambda = (args, body, env) => {
   let ctx = new Context(null, args);
 

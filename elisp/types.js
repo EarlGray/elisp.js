@@ -9,6 +9,7 @@ function from_js(val) {
     case 'number': return new LispInteger(val);
     case 'string': return new LispString(val);
     case 'symbol': return new LispSymbol(val.toString().slice(7, -1));
+    case 'boolean': return val ? exports.t : LispNil;
     case 'undefined': return LispNil;
     default: throw new LispError('Failed to lispify: ' + val.toString());
   }
@@ -54,13 +55,27 @@ LispInteger.prototype.equals = function(that) {
 function LispSymbol(sym) {
   this.sym = sym;
 };
+
+LispSymbol.interned = {
+  'lambda': new LispSymbol('lambda'),
+  'macro': new LispSymbol('macro'),
+  'quote': new LispSymbol('quote'),
+}
+LispSymbol.make = function(sym) {
+  if (sym in this.interned)
+    return this.interned[sym];
+  return new LispSymbol(sym);
+}
+
 LispSymbol.prototype = Object.create(LispObject.prototype);
 
 LispSymbol.prototype.to_string = function() { return this.sym; };
 LispSymbol.prototype.to_js = function() { return Symbol(this.sym); };
 LispSymbol.prototype.to_jsstring = function() { return "ty.symbol('" + this.sym + "')" };
 
-Object.defineProperty(LispSymbol.prototype, 'is_symbol', { value: true, writable: false });
+Object.defineProperty(LispSymbol.prototype,
+  'is_symbol', { value: true, writable: false }
+);
 
 LispSymbol.prototype.equals = function(that) {
   return that && that.__proto__ == this.__proto__
@@ -292,8 +307,19 @@ function LispFun(args, body, interact, doc) {
     bindings.push(LispNil);
   }
   this.bindings = bindings;
+
+  /* LispCons compatibility */
+  this.hd = exports.symbol('lambda');
+  let argl = consify(this.args.map((arg) => new LispSymbol(arg)));
+
+  if (body.hd && (body.hd.to_string() === 'progn')) {
+    body = body.tl;
+  }
+  this.tl = new LispCons(argl, body);
+  // */
 };
-LispFun.prototype = Object.create(LispObject.prototype);
+
+LispFun.prototype = Object.create(LispCons.prototype);
 
 Object.defineProperty(LispFun.prototype,
   'is_function', { value: true, writable: false }
@@ -303,13 +329,8 @@ LispFun.prototype.to_js = function() { return this.func; };
 LispFun.prototype.to_jsstring = function() { return this.jscode || '#<thunk>'; };
 
 LispFun.prototype.to_string = function() {
-  let argl = consify(this.args.map((arg) => new LispSymbol(arg)));
-  let body = this.body;
-  if (body.hd && (body.hd.to_string() === 'progn')) {
-    body = body.tl;
-  }
-  let fun = consify([new LispSymbol('lambda'), argl, body]);
-  return fun.to_string();
+
+  return LispCons.prototype.to_string.call(this);
 };
 
 LispFun.prototype.fcall = function(args, env) {
@@ -354,10 +375,15 @@ LispSubr.prototype.fcall = function(args, env) {
  *  macros
  */
 function LispMacro(transform) {
+  assert(transform instanceof LispFun);
   this.transform = transform;
+
+  /* LispCons */
+  this.hd = exports.symbol('macro');
+  this.tl = transform;
 };
 
-LispMacro.prototype = Object.create(LispObject.prototype);
+LispMacro.prototype = Object.create(LispCons.prototype);
 
 
 /*
@@ -381,32 +407,22 @@ LispError.prototype = Object.create(Error.prototype);
 /*
  *  exports
  */
-exports.LispObject = LispObject;
-exports.LispInteger = LispInteger;
-exports.LispNil = LispNil;
-exports.LispCons = LispCons;
-exports.LispSymbol = LispSymbol;
-exports.LispString = LispString;
-exports.LispVector = LispVector;
-exports.LispSubr = LispSubr;
 
-exports.any = () => true;
-exports.is_atom = (obj) => (obj == LispNil) || !obj.is_list;
-exports.is_list = (obj) => obj.is_list;
-exports.is_sequence = (obj) => obj.is_seq;
-exports.is_array = (obj) => obj.is_array;
-
-// Elisp->JS mapping is one-to-one:
+/* type predicates */
+exports.any =       (obj) => obj instanceof LispObject;
 exports.is_string = (obj) => obj.__proto__ == LispString.prototype;
 exports.is_vector = (obj) => obj.__proto__ == LispVector.prototype;
-exports.is_subr = (obj) => obj.__proto__ == LispSubr.prototype;
-// many JS object types may be a symbol:
-exports.is_symbol = (obj) => obj.is_symbol;
-exports.is_function = (obj) => obj.is_function;
-exports.is_number = (obj) => obj.is_number;
+exports.is_subr =   (obj) => obj.__proto__ == LispSubr.prototype;
 
-exports.nil     = LispNil;
-exports.t       = new LispSymbol('t');
+exports.is_symbol =   (obj) => obj.is_symbol;
+exports.is_function = (obj) => obj.is_function;
+exports.is_number =   (obj) => obj.is_number;
+exports.is_atom =     (obj) => (obj == LispNil) || !obj.is_list;
+exports.is_list =     (obj) => obj.is_list;
+exports.is_sequence = (obj) => obj.is_seq;
+exports.is_array =    (obj) => obj.is_array;
+
+/* constructors */
 exports.integer = (n) => (typeof n === 'undefined') ? LispNil : new LispInteger(n);
 exports.symbol  = (s) => new LispSymbol(s);
 exports.list    = (arr) => consify(arr);
@@ -414,11 +430,14 @@ exports.vector  = (arr) => new LispVector(arr);
 exports.string  = (s) => new LispString(s);
 exports.lambda  = (argspec, body, interact, doc) => new LispFun(argspec, body, interact, doc);
 exports.subr    = (name, argspec, jscode) => new LispSubr(name, argspec, eval(jscode));
-
 exports.cons    = (h, t) => new LispCons(h, t);
-
 exports.bool    = (b) => (b ? exports.t : exports.nil);
+
 exports.from_js = from_js;
 
 /* errors */
 exports.LispError = LispError;
+
+/* constants */
+exports.nil     = LispNil;
+exports.t       = new LispSymbol('t');

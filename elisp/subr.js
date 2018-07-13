@@ -21,7 +21,7 @@ let subroutines_registry = {};
 /* `func` : has the environment as `this` */
 function define_subr(name, args, func, attrs, doc) {
   /* TODO: make documentation database external */
-  let subr = new ty.LispSubr(name, args, func, attrs, doc);
+  let subr = ty.subr(name, args, func);
   subroutines_registry[name] = subr;
 };
 
@@ -43,6 +43,7 @@ define_subr('numberp', [[ty.any]], function(args) {
   return ty.bool(ty.is_number(args[0]));
 });
 
+// subset of symbolp
 define_subr('booleanp', [[ty.any]], function(args) {
   let expr = args[0];
   let val = ty.is_symbol(expr) && expr.to_string();
