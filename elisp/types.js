@@ -35,6 +35,9 @@ function LispInteger(num) {
   this.num = num;
 };
 LispInteger.prototype = Object.create(LispObject.prototype);
+Object.defineProperty(LispInteger.prototype,
+  'is_number', { value: true, writable: false }
+);
 
 LispInteger.prototype.to_string = function() { return this.num; };
 LispInteger.prototype.to_js = function() { return this.num; };
@@ -400,10 +403,11 @@ exports.is_subr = (obj) => obj.__proto__ == LispSubr.prototype;
 // many JS object types may be a symbol:
 exports.is_symbol = (obj) => obj.is_symbol;
 exports.is_function = (obj) => obj.is_function;
+exports.is_number = (obj) => obj.is_number;
 
 exports.nil     = LispNil;
 exports.t       = new LispSymbol('t');
-exports.integer = (n) => new LispInteger(n);
+exports.integer = (n) => (typeof n === 'undefined') ? LispNil : new LispInteger(n);
 exports.symbol  = (s) => new LispSymbol(s);
 exports.list    = (arr) => consify(arr);
 exports.vector  = (arr) => new LispVector(arr);

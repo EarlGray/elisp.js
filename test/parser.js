@@ -2,8 +2,8 @@
 
 const assert = require('assert');
 
-const parser = require('elisp/parser.js');
-const ty = require('elisp/types.js');
+const parser = require('../elisp/parser.js');
+const ty = require('../elisp/types.js');
 let nil = ty.nil;
 let cons = ty.cons;
 
@@ -27,10 +27,37 @@ describe('parser', () => {
       assert.equal(val.to_string(), num);
     };
 
-    it("should parse 0",    () => assertIntp('0', 0));
-    it("should parse 10",   () => assertIntp('10', 10));
-    it("should parse -1",   () => assertIntp('-1', -1));
-    it("should parse +42",  () => assertIntp('+42', 42));
+    it("0",    () => assertIntp('0', 0));
+    it("10",   () => assertIntp('10', 10));
+    it("-1",   () => assertIntp('-1', -1));
+    it("1.",   () => assertIntp('1.', 1));
+    it("+42",  () => assertIntp('+42', 42));
+
+    it("#x10", () => assertIntp('#x10', 16));
+    it("#x-a", () => assertIntp('#x-a', -10));
+
+    it("#b101100",  () => assertIntp('#b101100', 44));
+    it("#o54",      () => assertIntp('#o54', 44));
+    it("#x2c",      () => assertIntp('#x2c', 44));
+    it("#24r1k",    () => assertIntp('#24r1k', 44));
+
+    it("#x",    () => assert.equal(parser.read('#x'), ty.nil));
+    it("#x.",   () => assert.equal(parser.read('#x.'), ty.nil));
+    it("#x.1",  () => assert.equal(parser.read("#x.1"), ty.nil));
+    it("#b-.",  () => assert.equal(parser.read('#b-.'), ty.nil));
+  });
+
+  describe('.parseFloat', () => {
+    let assertFloatP = (input, num) => {
+      let val = parser.read(input);
+      assert.equal(val.to_js(), num);
+    };
+
+    it("1500.0",      () => assertFloatP('1500.0', 1500.0));
+    it("+15e2",       () => assertFloatP('15e2', 1500.0));
+    it("15.0e+2",     () => assertFloatP('15.0+2', 1500.0));
+    it("+1500000e-3", () => assertFloatP('+1500000e-3', 1500.0));
+    it(".15e4",       () => assertFloatP('.15e4', 1500.0));
   });
 
   describe('.parseCharacter', () => {

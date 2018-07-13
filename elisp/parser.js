@@ -32,9 +32,41 @@ let whitespace = gap.atLeast(1);
  */
 let Lisp = P.createLanguage({
   Integer: () => {
-    return P.regexp(/[+-]?[0-9]+/)
+    let int = (s, b) => {
+      let sign = '';
+      if (s.length == 0)
+        return; // ty.nil
+      if (s[0].match(/[+-]/)) {
+        sign = s[0];
+        s = s.slice(1);
+      }
+      if (s.indexOf('.') == 0)
+        return; // ty.nil
+      return parseInt(sign + s, b);
+    };
+    let decP = P.regexp(/[+-]?[0-9]+\.?/)
+      .map((s) => int(s, 10));
+    let binP = P.regexp(/#b[+-]?[01]*(\.[01]*)?/)
+      .map((s) => int(s.slice(2), 2));
+    let octP = P.regexp(/#o[+-]?[0-7]*(\.[0-7]*)?/)
+      .map((s) => int(s.slice(2), 8));
+    let hexP = P.regexp(/#x[+-]?[0-9a-fA-F]*(\.[0-9a-fA-F]*)?/)
+      .map((s) => int(s.slice(2), 16));
+    let baseP = P.seqMap(
+        P.regexp(/#[23]?[0-9]/),
+        P.regexp(/r[+-]?[0-9a-zA-Z]*(\.[0-9a-zA-Z]*)?/),
+        (b, s) => {
+          let base = parseInt(b.slice(1), 10);
+          if (!(2 <= base && base <= 36))
+            throw new ty.LispError(
+              "Invalid read syntax: integer, radix " + base
+            );
+          return int(s.slice(1), base);
+        });
+
+    return P.alt(binP, octP, hexP, baseP, decP)
       .lookahead(wordstop)     // otherwise it's a symbol
-      .map((x) => ty.integer(parseInt(x)))
+      .map((n) => ty.integer(n))
       .desc("number");
   },
 

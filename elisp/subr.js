@@ -29,13 +29,18 @@ function define_subr(name, args, func, attrs, doc) {
  *  types
  */
 define_subr('subrp', [[ty.any]], function(args) {
-  let expr = args[0];
-  return ty.bool(ty.is_subr(expr));
+  return ty.bool(ty.is_subr(args[0]));
 });
 
 define_subr('functionp', [[ty.any]], function(args) {
-  let expr = args[0];
-  return ty.bool(ty.is_function(expr));
+  return ty.bool(ty.is_function(args[0]));
+});
+
+define_subr('listp', [[ty.any]], function(args) {
+  return ty.bool(ty.is_list(args[0]));
+});
+define_subr('numberp', [[ty.any]], function(args) {
+  return ty.bool(ty.is_number(args[0]));
 });
 
 define_subr('booleanp', [[ty.any]], function(args) {
@@ -104,8 +109,18 @@ define_subr('<=', [[], [], ty.is_number], function(args) {
 /*
  *  Lists
  */
-define_subr('car', [[ty.is_list]], function(args) { return args[0].hd || ty.nil; });
-define_subr('cdr', [[ty.is_list]], function(args) { return args[0].tl || ty.nil; });
+define_subr('car', [[ty.is_list]], function(args) {
+  return args[0].hd || ty.nil;
+});
+define_subr('cdr', [[ty.is_list]], function(args) {
+  return args[0].tl || ty.nil;
+});
+define_subr('cons', [[ty.any, ty.any]], function(args) {
+  return ty.cons(args[0], args[1]);
+});
+define_subr('list', [[], [], ty.any], function(args) {
+  return ty.list(args);
+});
 
 /*
  *  environment

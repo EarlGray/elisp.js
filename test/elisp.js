@@ -2,8 +2,8 @@
 
 const assert = require('assert');
 
-const ty = require('elisp/types');
-const elisp = require('elisp/elisp');
+const ty = require('../elisp/types');
+const elisp = require('../elisp/elisp');
 
 
 let env = new elisp.Environment();

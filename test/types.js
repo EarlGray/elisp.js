@@ -2,7 +2,7 @@
 
 const assert = require('assert');
 
-const ty = require('elisp/types.js');
+const ty = require('../elisp/types.js');
 let cons = ty.cons;
 let nil = ty.nil;
 
