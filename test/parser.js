@@ -139,6 +139,14 @@ describe('parser', () => {
       let lc = ty.list([ty.symbol('`'), lc1]);
       assertEquals(lp, lc);
     });
+    it("`(list ,@splicing)", () => {
+      let lp = parse("`(1 2 ,@rest)");
+      let backtick = ty.symbol("`");
+      let splice = ty.symbol(",@");
+      let rest = ty.symbol('rest');
+      let lc = ty.list([backtick, ty.list([one, two, ty.list([splice, rest])])]);
+      assertEquals(lp, lc);
+    });
 
     xit("#'(lambda (x) x)", () => {
       let x = ty.symbol('x');
@@ -181,9 +189,9 @@ describe('parser', () => {
 
     it("should parse []",       () => assertVec('[]', []));
     it("should parse [foo 1]",
-        () => assertVec('[foo 1]', [foo, one]));
+        () => assertVec("[foo 1]", [foo, one]));
     it("should parse [ foo 1]",
-        () => assertVec('[ foo 1]', [foo, one]));
+        () => assertVec("[ foo 1]", [foo, one]));
   });
 
   describe('.parseExpr', () => {

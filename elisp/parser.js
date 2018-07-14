@@ -117,10 +117,11 @@ let Lisp = P.createLanguage({
   },
 
   Expression: (r) => {
-    let quotemap = {"'": "quote", "`": "`", ",":","};
-    let quote = P.seq(P.oneOf("'`,"), r.Expression)
-      .map((e) => ty.list([ty.symbol(quotemap[e[0]]), e[1]]))
-      .desc("quoted expression");
+    let quotemap = {"'": "quote", "#'": "function"};
+    let quote = P.seqMap(
+        P.alt(P.string(",@"), P.string("#'"), P.oneOf("'`,")), r.Expression,
+        (q, e) => ty.list([ty.symbol(quotemap[q] || q), e])
+      ).desc("quoted expression");
     // fast backtracking first:
     return P.alt(
       r.Character,
@@ -146,7 +147,7 @@ let Lisp = P.createLanguage({
   Vector: (r) => {
     let open = P.string('[').then(optWhitespace);
     let close = optWhitespace.then(P.string(']'));
-    return r.Expression.sepBy(whitespace)
+    return r.Expression.many()
       .wrap(open, close)
       .map(ty.vector)
       .desc("vector");
@@ -165,3 +166,4 @@ exports.parseList = mkParser(Lisp.List);
 exports.parseVector = mkParser(Lisp.Vector);
 
 exports.read = (input) => Lisp.Expression.tryParse(input.trim());
+exports.readtop = (input) => Lisp.Expression.many().tryParse(input);

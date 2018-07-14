@@ -56,4 +56,6 @@ exports.eval_text = eval_text;
 exports.eval_lisp = eval_lisp;
 
 exports.fcall = fcall;
+exports.read = parser.read;
+exports.readtop = parser.readtop;
 exports.Environment = Environment;
