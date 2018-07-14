@@ -8,6 +8,17 @@ var stderr = document.querySelector('#error');
 
 var env = new elisp.Environment();
 
+/* some Prelude */
+let prelude = [
+`(fset 'defmacro
+  '(macro lambda (name args body)
+      (list 'fset (list 'quote name) (list 'quote (list 'macro 'lambda args body)))))`,
+`(fset 'defun
+  '(macro lambda (name args body)
+      (list 'fset (list 'quote name) (list 'lambda args body))))`
+];
+prelude.forEach((stmt) => elisp.eval_text(stmt, env));
+
 stdin.oninput = function () {
   let code = stdin.value;
   if (code === '') {
