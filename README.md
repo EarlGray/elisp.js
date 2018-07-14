@@ -1,6 +1,10 @@
 # elisp.js
 
-This aims to be a translator from Emacs Lisp to Javascript. 
+This is a translator from Emacs Lisp to Javascript.
+
+## Demo
+
+https://dmytrish.net/elisp
 
 ## Why?
 
