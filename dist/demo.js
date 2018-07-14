@@ -39,12 +39,12 @@ stdin.oninput = function () {
     let result = elisp.eval_lisp(expr, env);
     stdin.style['border-right'] = '0.5em solid green';
     stderr.innerText = '';
-    stdout.innerHTML = result.to_string();
+    stdout.innerText = result.to_string();
   } catch (e) {
     if (e instanceof ty.LispError) {
       stdin.style['border-right'] = '0.5em solid gray';
       stdout.innerText = '';
-      stderr.innerHTML = e.message;
+      stderr.innerText = e.message;
     } else {
       stdin.style['border-right'] = '0.5em solid red';
       console.error(e);

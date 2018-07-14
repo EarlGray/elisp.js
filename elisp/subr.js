@@ -160,7 +160,7 @@ function(args) {
 define_subr('symbol-function', [[ty.is_symbol]],
 function(args) {
   let sym = args[0];
-  return this.fget(sym.to_string());
+  return this.fget(sym.to_string(), true);
 },
 { need_env: true });
 
