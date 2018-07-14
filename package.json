@@ -6,7 +6,8 @@
   "scripts": {
     "repl": "node repl.js",
     "test": "node_modules/mocha/bin/mocha",
-    "bench": "./bench/bench"
+    "bench": "./bench/bench",
+    "demo": "npx webpack --mode=production && cd dist && python3 -m http.server"
   },
   "repository": "https://github.com/EarlGray/language-incubator/fp/elisp.js",
   "keywords": [

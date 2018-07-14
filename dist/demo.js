@@ -15,7 +15,10 @@ let prelude = [
       (list 'fset (list 'quote name) (list 'quote (list 'macro 'lambda args body)))))`,
 `(fset 'defun
   '(macro lambda (name args body)
-      (list 'fset (list 'quote name) (list 'lambda args body))))`
+      (list 'fset (list 'quote name) (list 'lambda args body))))`,
+`(fset 'defvar
+  '(macro lambda (name val)
+      (list 'setq name val)))`,
 ];
 prelude.forEach((stmt) => elisp.eval_text(stmt, env));
 

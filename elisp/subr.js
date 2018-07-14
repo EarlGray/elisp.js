@@ -1,7 +1,5 @@
 'use strict';
 
-const util = require('util');
-
 const ty = require('./types');
 const translate = require('./translate');
 var elisp;
@@ -57,9 +55,6 @@ define_subr('booleanp', [[ty.any]], function(args) {
 /*
  *  introspection
  */
-define_subr('jsrepr', [[ty.any]], function(args) {
-  return ty.string(util.inspect(args[0]));
-});
 
 define_subr('jscode', [[ty.any]],
 function(args) {

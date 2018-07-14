@@ -4,11 +4,9 @@ const process = require('process');
 const ty = require('./elisp/types');
 const parser = require('./elisp/parser');
 const translate = require('./elisp/translate');
-
-const Environment = require('./elisp/environment').Environment;
-var env = new Environment();
-
 const elisp = require('./elisp/elisp');
+
+var env = new elisp.Environment();
 
 
 let replRawParser = (line) => parser.parseExpr(line);
@@ -24,8 +22,7 @@ let replEvaluator = (line) => elisp.eval_text(line, env);
  *  Arguments
  */
 
-/* default action */
-var loop = replEvaluator;
+var loop = replEvaluator; /* default action */
 
 let argv = process.argv;
 switch (argv[argv.length - 1]) {
@@ -62,6 +59,14 @@ function completer(line) {
   return [hits, key];
 }
 
+/* put special forms in the env */
+translate.special_forms.forEach((form) => {
+  let dummy = ty.subr(form, [], function() {
+    throw new Error("Congratulations! You've just called a dummy, which should never happen");
+  });
+  env.fset(form, dummy);
+});
+
 /*
  *  prelude
  */
@@ -71,10 +76,12 @@ let prelude = [
       (list 'fset (list 'quote name) (list 'quote (list 'macro 'lambda args body)))))`,
 `(fset 'defun
   '(macro lambda (name args body)
-      (list 'fset (list 'quote name) (list 'lambda args body))))`
+      (list 'fset (list 'quote name) (list 'lambda args body))))`,
+`(fset 'defvar
+  '(macro lambda (name val)
+      (list 'setq name val)))`,
 ];
 prelude.forEach((stmt) => elisp.eval_text(stmt, env));
-
 
 /*
  *  repl loop

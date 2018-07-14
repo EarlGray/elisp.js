@@ -222,6 +222,9 @@ let specials = {
     args = args.to_array();
     if (args.length % 2)
       throw new ty.LispError('Wrong number of arguments: setq, ' + args.length);
+    if (args.length == 0) {
+      return 'ty.nil';
+    }
 
     if (args.length == 2) {
       let [name, value] = args;
@@ -397,3 +400,5 @@ exports.lambda = (args, body, env) => {
 
   return `(() => { ${jsctx} return ${jsbody}; })`;
 };
+
+exports.special_forms = Object.keys(specials);
