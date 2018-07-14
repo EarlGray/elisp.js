@@ -4,8 +4,8 @@
   "description": "elisp to javascript translator",
   "main": "elisp/elisp.js",
   "scripts": {
-    "repl": "NODE_PATH=. node repl.js",
-    "test": "NODE_PATH=. node_modules/mocha/bin/mocha",
+    "repl": "node repl.js",
+    "test": "node_modules/mocha/bin/mocha",
     "bench": "./bench/bench"
   },
   "repository": "https://github.com/EarlGray/language-incubator/fp/elisp.js",

@@ -2,8 +2,9 @@
 
 const util = require('util');
 
-const ty = require('./types.js');
-const translate = require('./translate.js');
+const ty = require('./types');
+const translate = require('./translate');
+var elisp;
 
 let subroutines_registry = {};
 
@@ -34,6 +35,9 @@ define_subr('subrp', [[ty.any]], function(args) {
 
 define_subr('functionp', [[ty.any]], function(args) {
   return ty.bool(ty.is_function(args[0]));
+});
+define_subr('macrop', [[ty.any]], function(args) {
+  return ty.bool(ty.is_macro(args[0]));
 });
 
 define_subr('listp', [[ty.any]], function(args) {
@@ -71,6 +75,26 @@ function(args) {
 define_subr('jseval', [[ty.any]],
 function(args) {
   return ty.from_js(eval(args[0].to_js()));
+});
+
+define_subr('read', [[ty.string]], function(args) {
+  elisp = elisp || require('./elisp');
+  let input = args[0].to_js();
+  return ty.list(elisp.readtop(input));
+});
+
+define_subr('eval', [[ty.any]], function(args) {
+  elisp = elisp || require('./elisp');
+  return elisp.eval_lisp(args[0]);
+});
+
+define_subr('macroexpand-1', [[ty.any]], function(args) {
+  if (!ty.is_cons(args[0]))
+    return args[0];
+  let expr = args[0];
+  let sym = expr.hd.sym;
+  let f = this.fget(sym, true);
+  return f.macroexpand(expr.tl, this);
 });
 
 /*

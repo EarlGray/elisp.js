@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('assert');
+var elisp;  /* lazy-loaded './elisp' */
 
 function from_js(val) {
   if (val instanceof LispObject)
@@ -295,28 +296,44 @@ LispBoolvector.prototype = Object.create(LispObject.prototype);
  *  lambda
  */
 function LispFun(args, body, interact, doc) {
+  elisp = elisp || require('./elisp');
+
   this.args = args;
   this.body = body;
   this.interact = interact;
   this.doc = doc;
 
-  /* a template to fill */
-  let bindings = [];
-  for (let i = 0; i < args.length; ++i) {
-    bindings.push(args[i]);
-    bindings.push(LispNil);
-  }
-  this.bindings = bindings;
-
   /* LispCons compatibility */
   this.hd = exports.symbol('lambda');
   let argl = consify(this.args.map((arg) => new LispSymbol(arg)));
 
-  if (body.hd && (body.hd.to_string() === 'progn')) {
-    body = body.tl;
-  }
   this.tl = new LispCons(argl, body);
-  // */
+};
+
+LispFun.parse_argspec = function(args) {
+  let argspec = [];
+  args.forEach((arg) => {
+    if (!exports.is_symbol(arg))
+      throw new LispError('Wrong type argument: symbolp, ' + arg.to_string());
+    argspec.push(arg.to_string());
+  });
+  return argspec;
+};
+
+LispFun.from = function(lst) {
+  if (lst.hd.sym !== 'lambda')
+    return;
+  lst = lst.tl;
+  if (!exports.is_cons(lst))
+    return;
+
+  let args = lst.hd;
+  let argspec = LispFun.parse_argspec(args);
+  if (!argspec)
+    return;
+
+  let body = lst.tl;
+  return exports.lambda(argspec, body);
 };
 
 LispFun.prototype = Object.create(LispCons.prototype);
@@ -334,8 +351,7 @@ LispFun.prototype.to_string = function() {
 };
 
 LispFun.prototype.fcall = function(args, env) {
-  LispFun.fcall = LispFun.fcall || require('./elisp').fcall;
-  return LispFun.fcall.call(this, args, env);
+  return elisp.fcall.call(this, args, env);
 };
 
 /*
@@ -360,15 +376,7 @@ LispSubr.prototype.to_js = function() { return this.func; }
 LispSubr.prototype.to_jsstring = function () { return "subr.all['" + this.name + "']"; };
 
 LispSubr.prototype.fcall = function(args, env) {
-  try {
-    let result = this.func.call(env, args);
-    return result;
-  } catch (e) {
-    if (e instanceof TypeError)
-      throw new LispError('Wrong type argument: numberp');
-    else
-      throw e;
-  }
+  return this.func.call(env, args);
 };
 
 /*
@@ -383,7 +391,21 @@ function LispMacro(transform) {
   this.tl = transform;
 };
 
+LispMacro.from = function(lst) {
+  if (lst.hd.sym !== 'macro')
+    return;
+  let transform = LispFun.from(lst.tl);
+  if (!transform)
+    return;
+  return new LispMacro(transform);
+};
+
 LispMacro.prototype = Object.create(LispCons.prototype);
+
+LispMacro.prototype.macroexpand = function(args, env) {
+  args = args.to_array();
+  return this.transform.fcall(args, env);
+};
 
 
 /*
@@ -413,9 +435,11 @@ exports.any =       (obj) => obj instanceof LispObject;
 exports.is_string = (obj) => obj.__proto__ == LispString.prototype;
 exports.is_vector = (obj) => obj.__proto__ == LispVector.prototype;
 exports.is_subr =   (obj) => obj.__proto__ == LispSubr.prototype;
+exports.is_macro =  (obj) => obj.__proto__ == LispMacro.prototype;
+exports.is_cons =   (obj) => obj.__proto__ == LispCons.prototype;
 
-exports.is_symbol =   (obj) => obj.is_symbol;
 exports.is_function = (obj) => obj.is_function;
+exports.is_symbol =   (obj) => obj.is_symbol;
 exports.is_number =   (obj) => obj.is_number;
 exports.is_atom =     (obj) => (obj == LispNil) || !obj.is_list;
 exports.is_list =     (obj) => obj.is_list;
@@ -437,6 +461,16 @@ exports.from_js = from_js;
 
 /* errors */
 exports.LispError = LispError;
+
+/* functions,macros */
+exports.parse_argspec = LispFun.parse_argspec;
+exports.from_list = (lst) => {
+  if (exports.is_cons(lst)) {
+    let callable = LispFun.from(lst) || LispMacro.from(lst);
+    return callable || lst;
+  }
+  return lst;
+};
 
 /* constants */
 exports.nil     = LispNil;

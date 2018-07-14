@@ -220,7 +220,46 @@ describe('functions', () => {
 
 
 describe('macros', () => {
-  xit("fset's macro", () => {
+  it("fset's macro", () => {
+    let env = new elisp.Environment();
+    elisp.eval_text("(fset 'twice '(macro lambda (fn arg) (list fn (list fn arg))))", env);
+    elisp.eval_text("(fset 'sqr (lambda (x) (* x x)))", env);
+    let result = elisp.eval_text("(twice sqr 2)", env);
+    assert.equal(result, 16);
+  });
+
+  it("macroexpand-1", () => {
+    let x = ty.symbol('x');
+    let plus = ty.symbol('+');
+    let setq = ty.symbol('setq');
+    let lp = ty.list([setq, x, ty.list([plus, x, ty.integer(1)])]);
+
+    let env = new elisp.Environment();
+    elisp.eval_text("(fset 'inc '(macro lambda (v) (list 'setq v (list '+ v 1))))", env);
+    let result = elisp.eval_text("(macroexpand-1 '(inc x))", env);
+
+    assert.equal(result, lp.to_string());
+  });
+
+  it("does defuns", () => {
+    let env = new elisp.Environment();
+    let defbody = "(list 'fset (list 'quote name) (list 'quote (list 'lambda args body)))";
+    let defun = `(macro lambda (name args body) ${defbody})`;
+    elisp.eval_text(`(fset 'defun '${defun})`, env);
+    elisp.eval_text("(defun sqr (x) (* x x))", env);
+    assert.equal(elisp.eval_text("(sqr 23)", env), 529);
+  });
+
+  it("does defmacro", () => {
+    let env = new elisp.Environment();
+    let defbody = "(list 'fset (list 'quote name) (list 'quote (list 'macro 'lambda args body)))";
+    let defmacro = `(macro lambda (name args body) ${defbody})`;
+    elisp.eval_text(`(fset 'defmacro '${defmacro})`, env);
+    elisp.eval_text("(defmacro test () :yep)", env);
+    assert.equal(elisp.eval_text("(test)", env), ":yep");
+  });
+
+  xit("fset's macro in progn", () => {
     let code = `(progn
       (fset 'twice '(macro lambda (fn arg) (list fn (list fn arg))))
       (fset 'sqr (lambda (x) (* x x)))

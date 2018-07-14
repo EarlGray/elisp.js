@@ -106,22 +106,11 @@ function translate_fget(name, env, ctx) {
   return `${env.to_jsstring()}.fget('${name}')`;
 }
 
-function get_argspec(args) {
-  let argspec = [];
-  //console.error('### get_argspec: args = ' + args.to_string());
-  args.forEach((arg) => {
-    if (!ty.is_symbol(arg))
-      throw new ty.LispError('Wrong type argument: symbolp, ' + arg.to_string());
-    argspec.push(arg.to_string());
-  });
-  return argspec;
-}
-
 function translate_let(args, env, ctx) {
   /* sanity checks */
   if (args.is_false)
     throw new ty.LispError('Wrong number of arguments: let', 0);
-  if (!ty.is_list(args))
+  if (!ty.is_cons(args))
     throw new ty.LispError('Wrong type argument: listp, ' + args.to_jsstring());
 
   let varlist = args.hd;
@@ -150,7 +139,7 @@ function translate_let(args, env, ctx) {
     if (ty.is_symbol(binding)) {
       names.push(binding.to_string());
       values.push(ty.nil.to_jsstring());
-    } else if (ty.is_list(binding)) {
+    } else if (ty.is_cons(binding)) {
       let name = binding.hd;
       binding = binding.tl;
       let jsval = translate_expr(binding.hd || ty.nil, env, ctx);
@@ -177,12 +166,6 @@ function translate_let(args, env, ctx) {
     })()`;
   }
 
-  let bindings = [];
-  for (let i = 0; i < names.length; ++i) {
-    bindings.push("`" + names[i] + "`");
-    bindings.push(values[i]);
-  }
-  bindings = bindings.join(', ');
 
   let ctx1 = new Context(ctx, names);
   let jscode = body ? translate_expr(body, env, ctx1) : ty.nil.to_jsstring();
@@ -190,10 +173,11 @@ function translate_let(args, env, ctx) {
 
   let jsenv = env.to_jsstring();
   let jsnames = names.map((n) => '`'+n+'`').join(', ');
+  let jsvalues = values.join(', ');
   return `(() => {
-    ${jsenv}.push(${bindings});
+    ${jsenv}.push([${jsnames}], [${jsvalues}]);
     ${jsctx} let result = ${jscode};
-    ${jsenv}.pop(${jsnames});
+    ${jsenv}.pop([${jsnames}]);
     return result;
   })()`;
 }
@@ -213,24 +197,11 @@ function translate_lambda(args, env) {
   if (!ty.is_list(argv))
     return error(`Invalid function: ${repr.to_string()}`);
 
-  let argspec;
-  try {
-    argspec = get_argspec(argv);
-  } catch (e) {
+  let argspec = ty.parse_argspec(argv);
+  if (!argspec)
     return error(`Invalid function: ${repr.to_string()}`);
-  }
   argspec = argspec.map((arg) => '`' + arg + '`');
   argspec = '[' + argspec.join(', ') + ']';
-
-  if (body.is_false) {
-    // do nothing, it must evaluate to nil
-  } else if (body.tl.is_false) {
-    // single form, extract
-    body = body.hd;
-  } else {
-    // mutliple forms, prepend `progn`
-    body = ty.cons(ty.symbol('progn'), body);
-  }
 
   return `ty.lambda(${argspec}, ${body.to_jsstring()})`;
 }
@@ -345,9 +316,11 @@ let specials = {
 
 function translate_expr(input, env, ctx) {
   if (input.is_false) {
+    /* nil */
     return ty.nil.to_jsstring();
   }
-  if (ty.is_list(input)) {
+  if (ty.is_cons(input)) {
+    /* a form */
     let hd = input.hd;
     let args = input.tl;
 
@@ -356,13 +329,26 @@ function translate_expr(input, env, ctx) {
       let args = input.tl;
       let sym = hd.to_string();
 
+      /* (<special form> ...) */
       if (sym in specials)
         return (specials[sym])(args, env, ctx);
 
+      /* macro? */
+      if (env.is_fbound(sym)) {
+        let f = env.fget(sym, true);
+        if (ty.is_macro(f)) {
+          let expanded = f.macroexpand(args, env);
+          return translate_expr(expanded, env, ctx);
+        }
+      }
+
+      /* (<func name> ...) */
       callable = translate_fget(sym, env, ctx);
     } else if (ty.is_list(hd)) {
+      /* ((some form) ...) */
       callable = translate_expr(hd, env, ctx);
     } else {
+      /* (:wrongtype ...) */
       callable = `ty.subr('#<error>', [], (() => { throw new ty.LispError('Invalid function: ${hd.to_string()}'); }))`;
     }
 

@@ -12,17 +12,27 @@ function fcall(args, env) {
     throw new ty.LispError('Wrong number of arguments: ' + this.to_string() + ', ' + args.length);
 
   if (!this.func) {
-    this.jscode = translate.lambda(this.args, this.body, env);
+    let body = this.body;
+    if (body.is_false) {
+      // do nothing, it must evaluate to nil
+    } else if (body.tl.is_false) {
+      // single form, extract
+      body = body.hd;
+    } else {
+      // mutliple forms, prepend `progn`
+      body = ty.cons(ty.symbol('progn'), body);
+    }
+
+    this.jscode = translate.lambda(this.args, body, env);
     // console.error(`### fcall : ${this.jscode}`);
     this.func = eval(this.jscode);
   }
 
   try {
-    args.forEach((val, i) => { this.bindings[i+i+1] = val; });
-    env.push.apply(env, this.bindings);
+    env.push.call(env, this.args, args);
     var result = this.func();
   } finally {
-    env.pop.apply(env, this.args);
+    env.pop.call(env, this.args);
   }
   return result;
 }

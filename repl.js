@@ -1,14 +1,14 @@
 const readline = require('readline');
 const process = require('process');
 
-const ty = require('elisp/types');
-const parser = require('elisp/parser');
-const translate = require('elisp/translate');
+const ty = require('./elisp/types');
+const parser = require('./elisp/parser');
+const translate = require('./elisp/translate');
 
-const Environment = require('elisp/environment').Environment;
+const Environment = require('./elisp/environment').Environment;
 var env = new Environment();
 
-const elisp = require('elisp/elisp');
+const elisp = require('./elisp/elisp');
 
 
 let replRawParser = (line) => parser.parseExpr(line);

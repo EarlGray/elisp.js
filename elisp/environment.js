@@ -3,6 +3,7 @@
 const ty = require('./types');
 const subr = require('./subr');
 
+
 /*
  *  Variables are handles to a value stack inside Environment
  *    (to have less keyed lookups in hot code)
@@ -19,6 +20,8 @@ Variable.prototype.get = function() {
   throw new ty.LispError("Symbol's value as variable is void: " + this.name);
 };
 Variable.prototype.set = function(val) {
+  if (this.is_fun)
+    val = ty.from_list(val)
   this.stack[0] = val;
   return val;
 };
@@ -53,10 +56,15 @@ Environment.prototype.fun = function(name) {
     if (sub)
       stack.push(sub);
   }
+  if (stack.length && ty.is_macro(stack[0]))
+    throw new Error('Macro accessed as a function');
   return new Variable(name, stack, true);
 }
 
 Environment.prototype.fset = function(name, value) {
+  /* try to make it LispFun/LispMacro */
+  value = ty.from_list(value);
+
   let stack = this.fs[name];
   if (stack === undefined) {
     this.fs[name] = [value];
@@ -66,10 +74,13 @@ Environment.prototype.fset = function(name, value) {
   return value;
 }
 
-Environment.prototype.fget = function(name) {
+Environment.prototype.fget = function(name, is_macro) {
   let stack = this.fs[name];
-  if (stack && stack.length)
+  if (stack && stack.length) {
+    if (ty.is_macro(stack[0]) && !is_macro)
+      throw new Error('Macro accessed as a function');
     return stack[0];
+  }
   let sub = subr.all[name];
   if (sub) {
     this.fs[name] = [sub];
@@ -116,10 +127,10 @@ Environment.prototype.get = function(name) {
   throw new ty.LispError("Symbol's value as variable is void: " + name);
 };
 
-Environment.prototype.push = function() {
-  for (let i = 0; i < arguments.length; i += 2) {
-    let name = arguments[i];
-    let value = arguments[i+1];
+Environment.prototype.push = function(names, values) {
+  for (let i = 0; i < names.length; ++i) {
+    let name = names[i];
+    let value = values[i];
 
     let stack = this.vs[name];
     if (stack === undefined) {
@@ -130,9 +141,9 @@ Environment.prototype.push = function() {
   }
 };
 
-Environment.prototype.pop = function() {
-  for (let i = 0; i < arguments.length; ++i) {
-    let name = arguments[i];
+Environment.prototype.pop = function(names) {
+  for (let i = 0; i < names.length; ++i) {
+    let name = names[i];
     this.vs[name].shift();
   }
 };
