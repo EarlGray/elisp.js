@@ -42,12 +42,48 @@ switch (argv[argv.length - 1]) {
 };
 
 /*
+ *  completer
+ */
+function completer(line) {
+  let par = line.lastIndexOf('(');
+  let gap = line.lastIndexOf(' ');
+  let start = ((par > gap) ? par : gap ) + 1;
+
+  let key = line.slice(start);
+  if (key.length == 0)
+    return [[], line];
+
+  let hits = [];
+  for (let name in ((par > gap ? env.fs : env.vs))) {
+    if (name.startsWith(key))
+      hits.push(name);
+  }
+
+  return [hits, key];
+}
+
+/*
+ *  prelude
+ */
+let prelude = [
+`(fset 'defmacro
+  '(macro lambda (name args body)
+      (list 'fset (list 'quote name) (list 'quote (list 'macro 'lambda args body)))))`,
+`(fset 'defun
+  '(macro lambda (name args body)
+      (list 'fset (list 'quote name) (list 'lambda args body))))`
+];
+prelude.forEach((stmt) => elisp.eval_text(stmt, env));
+
+
+/*
  *  repl loop
  */
 let rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
-  prompt: 'elisp> '
+  prompt: 'elisp> ',
+  completer: completer
 });
 
 rl.prompt();
@@ -55,8 +91,6 @@ rl.prompt();
 rl.on('line', (line) => {
   line = line.trim();
   if (!line) return;
-  if (line === 'q')
-    return rl.close();
 
   try {
     console.log(loop(line));
@@ -69,4 +103,7 @@ rl.on('line', (line) => {
   };
 
   rl.prompt();
+});
+rl.on('close', () => {
+  console.log('');
 });

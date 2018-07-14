@@ -32,11 +32,14 @@ Variable.prototype.set = function(val) {
 function Environment(name) {
   this.name = name || 'env';
 
-  /* functions: name->LispFun */
-  this.fs = {};
-
   /* values: name -> stack of values */
   this.vs = {};
+
+  /* functions: name->LispFun */
+  this.fs = {};
+  for (let sub in subr.all) {
+    this.fs[sub] = [subr.all[sub]];
+  }
 }
 
 Environment.prototype.to_jsstring = function() {
@@ -51,10 +54,6 @@ Environment.prototype.fun = function(name) {
   if (stack === undefined) {
     stack = [];
     this.fs[name] = stack;
-
-    let sub = subr.all[name];
-    if (sub)
-      stack.push(sub);
   }
   if (stack.length && ty.is_macro(stack[0]))
     throw new Error('Macro accessed as a function');
@@ -80,11 +79,6 @@ Environment.prototype.fget = function(name, is_macro) {
     if (ty.is_macro(stack[0]) && !is_macro)
       throw new Error('Macro accessed as a function');
     return stack[0];
-  }
-  let sub = subr.all[name];
-  if (sub) {
-    this.fs[name] = [sub];
-    return sub;
   }
   throw new ty.LispError("Symbol's function definition is void: " + name);
 }
@@ -154,7 +148,7 @@ Environment.prototype.is_bound = function(name) {
 };
 Environment.prototype.is_fbound = function(name) {
   let stack = this.fs[name];
-  return subr.all[name] || (stack && stack.length);
+  return (stack && stack.length);
 };
 
 Environment.prototype.has_jsdebug = function() {
