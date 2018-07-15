@@ -17,7 +17,8 @@ function Variable(name, stack, is_fun) {
 Variable.prototype.get = function() {
   if (this.stack.length)
     return this.stack[0];
-  throw new ty.LispError("Symbol's value as variable is void: " + this.name);
+  let ns = this.is_fun ? "function" : "variable";
+  throw new ty.LispError(`Symbol's value as ${ns} is void: ${this.name}`);
 };
 Variable.prototype.set = function(val) {
   if (this.is_fun)

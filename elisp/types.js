@@ -351,7 +351,15 @@ LispFun.prototype.to_string = function() {
 };
 
 LispFun.prototype.fcall = function(args, env) {
-  return elisp.fcall.call(this, args, env);
+  try {
+    return elisp.fcall.call(this, args, env);
+  } catch (e) {
+    if (e.message !== 'Macro accessed as a function')
+      throw e;
+    /* trigger recompilation */
+    this.func = undefined;
+    return elisp.fcall.call(this, args, env);
+  }
 };
 
 /*
