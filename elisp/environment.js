@@ -30,7 +30,7 @@ Variable.prototype.set = function(val) {
 /*
  *  Lisp Environment:
  */
-function Environment(name) {
+function Environment(name, custom_subrs) {
   this.name = name || 'env';
 
   /* values: name -> stack of values */
@@ -39,7 +39,11 @@ function Environment(name) {
   /* functions: name->LispFun */
   this.fs = {};
   for (let sub in subr.all) {
-    this.fs[sub] = [subr.all[sub]];
+    this.fs[sub] = [ subr.all[sub] ];
+  }
+  if (typeof custom_subrs === 'object') {
+    for (let sub in custom_subrs)
+      this.fs[sub] = [ custom_subrs[sub] ];
   }
 }
 

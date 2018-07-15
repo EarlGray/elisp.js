@@ -8,33 +8,40 @@ const elisp = require('./elisp/elisp');
 
 var env = new elisp.Environment();
 
+/* put special forms in the env */
+translate.special_forms.forEach((form) => {
+  let dummy = ty.subr(form, [], function() {
+    throw new Error("Congratulations! You've just called a dummy, which should never happen");
+  });
+  env.fset(form, dummy);
+});
 
-let replRawParser = (line) => parser.parseExpr(line);
-let replParser = (line) => parser.parseExpr(line).to_string();
-let replTranslator = (line) => {
-  let expr = parser.parseExpr(line);
-  let jscode = translate.expr(expr);
-  return jscode;
-};
-let replEvaluator = (line) => elisp.eval_text(line, env);
+/*
+ *  prelude
+ */
+let prelude = [
+`(fset 'defmacro
+  '(macro lambda (name args body)
+      (list 'fset (list 'quote name) (list 'quote (list 'macro 'lambda args body)))))`,
+`(fset 'defun
+  '(macro lambda (name args body)
+      (list 'fset (list 'quote name) (list 'lambda args body))))`,
+`(fset 'defvar
+  '(macro lambda (name val)
+      (list 'setq name val)))`,
+`(setq *jsdebug* nil)`,
+];
+prelude.forEach((stmt) => elisp.eval_text(stmt, env));
+
 
 /*
  *  Arguments
  */
 
-var loop = replEvaluator; /* default action */
-
 let argv = process.argv;
 switch (argv[argv.length - 1]) {
-  case '--raw': loop = replRawParser; break;
-  case '--parse': loop = replParser; break;
-  case '--js': loop = replTranslator; break;
   case '--help': 
-    console.error('[wannabe] Elisp to JS translator');
-    console.error('Usage:');
-    console.error(`  ${argv[1]} --parse\t: parse Elisp and print AST`);
-    console.error(`  ${argv[1]} --js\t: see generated JS code`);
-    console.error(`  ${argv[1]} --eval\t: [default] evaluate Elisp`);
+    console.error('Elisp to JS translator');
     process.exit();
 };
 
@@ -59,30 +66,6 @@ function completer(line) {
   return [hits, key];
 }
 
-/* put special forms in the env */
-translate.special_forms.forEach((form) => {
-  let dummy = ty.subr(form, [], function() {
-    throw new Error("Congratulations! You've just called a dummy, which should never happen");
-  });
-  env.fset(form, dummy);
-});
-
-/*
- *  prelude
- */
-let prelude = [
-`(fset 'defmacro
-  '(macro lambda (name args body)
-      (list 'fset (list 'quote name) (list 'quote (list 'macro 'lambda args body)))))`,
-`(fset 'defun
-  '(macro lambda (name args body)
-      (list 'fset (list 'quote name) (list 'lambda args body))))`,
-`(fset 'defvar
-  '(macro lambda (name val)
-      (list 'setq name val)))`,
-];
-prelude.forEach((stmt) => elisp.eval_text(stmt, env));
-
 /*
  *  repl loop
  */
@@ -100,7 +83,8 @@ rl.on('line', (line) => {
   if (!line) return;
 
   try {
-    console.log(loop(line));
+    let result = elisp.eval_text(line, env);
+    console.log(result);
   } catch (e) {
     let jsdebug = env.has_jsdebug();
     if (e instanceof ty.LispError && jsdebug)
