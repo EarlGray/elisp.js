@@ -1,5 +1,7 @@
 const readline = require('readline');
 const process = require('process');
+const path = require('path');
+const fs = require('fs');
 
 const ty = require('./elisp/types');
 const parser = require('./elisp/parser');
@@ -17,6 +19,43 @@ translate.special_forms.forEach((form) => {
 });
 
 env.fset('load', ty.subr('load', [], function(args) {
+  if (!ty.is_string(args[0]))
+    throw new ty.LispError('Wrong type argument: stringp, ' + args[0].to_string());
+
+  let tryFileName = (fname) => {
+    try {
+      fs.accessSync(fname, fs.constants.R_OK);
+      return fname;
+    } catch (e) {}
+    try {
+      fs.accessSync(fname + '.el', fs.constants.R_OK)
+      return fname + '.el';
+    } catch (e) {}
+    return null;
+  };
+
+  let filename = args[0].to_js();
+  let fullpath;
+  if (path.isAbsolute(filename)) {
+    fullpath = tryFileName(filename);
+  } else if (this.is_bound('load-path')) {
+    let loadpath = this.get('load-path');
+    for (let p = loadpath; !p.is_false; p = p.tl) {
+      let base = path.resolve(p.hd.is_false ? process.cwd() : p.hd.to_js());
+      fullpath = tryFileName(path.join(base, filename));
+      if (fullpath)
+        break;
+    }
+  } else
+    throw new ty.LispError('`load-path` is not set');
+  if (!fullpath)
+    throw new ty.LispError('Cannot open load file: ' + filename);
+
+  let text = fs.readFileSync(fullpath, 'utf8');
+  let forms = elisp.readtop(text, fullpath);
+  forms.forEach((form) => elisp.eval_lisp(form, this));
+
+  return ty.t;
 }));
 
 /*
@@ -43,7 +82,7 @@ prelude.forEach((stmt) => elisp.eval_text(stmt, env));
 
 let argv = process.argv;
 switch (argv[argv.length - 1]) {
-  case '--help': 
+  case '--help':
     console.error('Elisp to JS translator');
     process.exit();
 };
