@@ -46,7 +46,7 @@ LispInteger.prototype.to_js = function() { return this.num; };
 LispInteger.prototype.to_jsstring = function() { return 'ty.integer(' + this.num + ')'; };
 
 LispInteger.prototype.equals = function(that) {
-  return that && that.__proto__ == this.__proto__
+  return that && that instanceof LispInteger
     && this.num === that.num;
 };
 
@@ -79,7 +79,7 @@ Object.defineProperty(LispSymbol.prototype,
 );
 
 LispSymbol.prototype.equals = function(that) {
-  return that && that.__proto__ == this.__proto__
+  return that && that instanceof LispSymbol
     && that.sym === this.sym;
 };
 
@@ -178,7 +178,7 @@ LispCons.prototype.seqlen = function() {
 };
 
 LispCons.prototype.equals = function(that) {
-  return that && that.__proto__ === this.__proto__
+  return that && that instanceof LispCons
     && that.hd.equals(this.hd) && that.tl.equals(this.tl);
 };
 
@@ -223,7 +223,7 @@ LispString.prototype.seqlen = function() {
 };
 
 LispString.prototype.equals = function(that) {
-  return that && that.__proto__ == this.__proto__
+  return that && that instanceof LispString
     && that.str === this.str;
 };
 
@@ -270,7 +270,7 @@ LispVector.prototype.seqlen = function() {
   return this.arr.length;
 };
 LispVector.prototype.equals = function(that) {
-  return that && that.__proto__ == this.__proto__
+  return that && that instanceof LispVector
     && this.arr.length == that.arr.length
     && this.arr.every((v, i) => that.arr[i].equals(v));
 };
@@ -440,11 +440,11 @@ LispError.prototype = Object.create(Error.prototype);
 
 /* type predicates */
 exports.any =       (obj) => obj instanceof LispObject;
-exports.is_string = (obj) => obj.__proto__ == LispString.prototype;
-exports.is_vector = (obj) => obj.__proto__ == LispVector.prototype;
-exports.is_subr =   (obj) => obj.__proto__ == LispSubr.prototype;
-exports.is_macro =  (obj) => obj.__proto__ == LispMacro.prototype;
-exports.is_cons =   (obj) => obj.__proto__ == LispCons.prototype;
+exports.is_string = (obj) => obj instanceof LispString;
+exports.is_vector = (obj) => obj instanceof LispVector;
+exports.is_subr =   (obj) => obj instanceof LispSubr;
+exports.is_macro =  (obj) => obj instanceof LispMacro;
+exports.is_cons =   (obj) => obj instanceof LispCons;
 
 exports.is_function = (obj) => obj.is_function;
 exports.is_symbol =   (obj) => obj.is_symbol;
