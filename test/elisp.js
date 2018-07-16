@@ -12,6 +12,16 @@ let assertEval = (input, output) => {
   let result = elisp.eval_text(input, env);
   assert.equal(result, output);
 };
+
+let assertEvalTop = (code, output) => {
+  let result;
+  let env = new elisp.Environment();
+  elisp.readtop(code).forEach((form) => {
+    result = elisp.eval_lisp(form, env);
+  });
+  assert.equal(result.to_string(), output);
+};
+
 let assertThrows = (input) => {
   /* TODO : make it check error message */
   assert.throws(() => elisp.eval_text(input, env), ty.LispError);
@@ -71,9 +81,9 @@ describe('types', () => {
   describe('functionp', () => {
     it("should accept functions", () => assertEval("(functionp (symbol-function '+))", "t"));
     it("should accept functions", () => assertEval("(functionp (lambda (x) x))", "t"));
-    xit("should reject others", () => {
+    it("should reject others", () => {
       let code = `(progn
-        (defmacro twice (fn x) \`(,f (,f ,x)))
+        (fset 'twice '(macro lambda (f x) \`(,f (,f ,x))))
         (functionp (symbol-function 'twice)))`;
       assertEval(code, "nil");
     });
@@ -176,9 +186,9 @@ describe('functions', () => {
     it("((lambda ())) === nil",
         () => assertEval("((lambda ()))", "nil"));
 
-    xit("((lambda . 1)) should be invalid",
+    it("((lambda . 1)) should be invalid",
         () => assertThrows("((lambda . 1))", "Wrong type argument: listp, 1"));
-    xit("((lambda)) should be invalid",
+    it("((lambda)) should be invalid",
         () => assertThrows("((lambda))", "Invalid function: (lambda)"));
 
     it("should check argument count (1 to 2)",
@@ -203,18 +213,9 @@ describe('functions', () => {
         () => assertThrows("((lambda (1) 1) 1)", "Invalid function: (lambda (1) 1)"));
   });
 
-  xdescribe('defun', () => {
-    it("(defun sqr (x) (* x x))", () => {
-      let code = `(progn
-        (defun sqr (x) (* x x))
-        (let ((x 12)) (sqr x)))`;
-      assertEval(code, 144);
-    });
+  describe('funcall/apply', () => {
   });
-
-  xdescribe('funcall/apply', () => {
-  });
-  xdescribe('apply-partially', () => {
+  describe('apply-partially', () => {
   });
 });
 
@@ -259,32 +260,34 @@ describe('macros', () => {
     assert.equal(elisp.eval_text("(test)", env), ":yep");
   });
 
-  xit("fset's macro in progn", () => {
-    let code = `(progn
+  it("fset's macro in progn", () => {
+    let code = `
       (fset 'twice '(macro lambda (fn arg) (list fn (list fn arg))))
       (fset 'sqr (lambda (x) (* x x)))
-      (twice sqr 2))`;
-    assertEval(code, 16);
+      (twice sqr 2)
+    `;
+    assertEvalTop(code, 16);
   });
 
-  xit("macroexpand: macro before defun", () => {
-    let code = `(progn
+  it("macroexpand: macro before defun", () => {
+    let code = `
       (fset 'macro1 '(macro lambda () :before))
       (fset 'test (lambda () (macro1)))
+      (test)
       (fset 'macro1 '(macro lambda () :after))
-      (test1)
-    )`;
-    assertEval(code, ":before");
+      (test)
+    `;
+    assertEvalTop(code, ":before");
   });
 
   xit("macroexpand: macro after defun", () => {
-    let code = `(progn
+    let code = `
       (fset 'test (lambda () (macro1)))
       (fset 'macro1 '(macro lambda () :after1))
       (let ((ret1 (test)))
          (fset 'macro1 '(macro lambda () :after2))
-         (cons ret1 (test)))
-    )`;
-    assertEval(code, "(:after1 . :after2)");
+         (cons ret1 (test))) `;
+
+    assertEvalTop(code, "(:after1 . :after2)");
   });
 });

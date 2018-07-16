@@ -141,6 +141,7 @@ describe('parser', () => {
     });
     it("`(list ,@splicing)", () => {
       let lp = parse("`(1 2 ,@rest)");
+
       let backtick = ty.symbol("`");
       let splice = ty.symbol(",@");
       let rest = ty.symbol('rest');
@@ -148,12 +149,14 @@ describe('parser', () => {
       assertEquals(lp, lc);
     });
 
-    xit("#'(lambda (x) x)", () => {
+    it("#'(lambda (x) x)", () => {
+      let lp = parse("#'(lambda (x) x)");
+
       let x = ty.symbol('x');
       let lambda = ty.symbol('lambda');
       let fun = ty.list([lambda, ty.list([x]), x]);
       let funq = ty.list([ty.symbol('function'), fun]);
-      assertEquals("#'(lambda (x) x)", funq);
+      assertEquals(lp, funq);
     });
   });
 
