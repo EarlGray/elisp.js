@@ -157,7 +157,7 @@ Environment.prototype.is_fbound = function(name) {
 };
 
 Environment.prototype.has_jsdebug = function() {
-  return !(this.is_bound('*jsdebug*') && !this.get('*jsdebug*').is_false);
+  return this.is_bound('*jsdebug*') && !this.get('*jsdebug*').is_false;
 };
 
 exports.Environment = Environment;

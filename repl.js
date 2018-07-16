@@ -16,6 +16,9 @@ translate.special_forms.forEach((form) => {
   env.fset(form, dummy);
 });
 
+env.fset('load', ty.subr('load', [], function(args) {
+}));
+
 /*
  *  prelude
  */
@@ -87,7 +90,7 @@ rl.on('line', (line) => {
     console.log(result);
   } catch (e) {
     let jsdebug = env.has_jsdebug();
-    if (e instanceof ty.LispError && jsdebug)
+    if (e instanceof ty.LispError && !jsdebug)
       console.error(e.name + ': ' + e.message);
     else
       console.error(e.stack);
