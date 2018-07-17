@@ -7,9 +7,9 @@
     "repl": "node repl.js",
     "test": "node_modules/mocha/bin/mocha",
     "bench": "./bench/bench",
-    "demo": "npx webpack --mode=production && cd dist && python3 -m http.server"
+    "demo": "cp demo/*.htm dist/ && npx webpack --mode=production && cd dist && python3 -m http.server"
   },
-  "repository": "https://github.com/EarlGray/language-incubator/fp/elisp.js",
+  "repository": "https://github.com/EarlGray/elisp.js",
   "keywords": [
     "translator",
     "elisp"
