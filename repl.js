@@ -2,6 +2,7 @@ const readline = require('readline');
 const process = require('process');
 const path = require('path');
 const fs = require('fs');
+const zlib = require('zlib');
 
 const ty = require('./elisp/types');
 const parser = require('./elisp/parser');
@@ -23,15 +24,14 @@ env.fset('load', ty.subr('load', [], function(args) {
     throw new ty.LispError('Wrong type argument: stringp, ' + args[0].to_string());
 
   let tryFileName = (fname) => {
-    try {
-      fs.accessSync(fname, fs.constants.R_OK);
-      return fname;
-    } catch (e) {}
-    try {
-      fs.accessSync(fname + '.el', fs.constants.R_OK)
-      return fname + '.el';
-    } catch (e) {}
-    return null;
+    let tryfile = (f) => {
+      try { fs.accessSync(f, fs.constants.R_OK); return true; }
+      catch (e) { return false };
+    };
+    if (tryfile(fname)) return fname;
+    if (tryfile(fname + '.el')) return fname + '.el';
+    if (tryfile(fname + '.gz')) return fname + '.gz';
+    if (tryfile(fname + '.el.gz')) return fname + '.el.gz';
   };
 
   let filename = args[0].to_js();
@@ -51,9 +51,15 @@ env.fset('load', ty.subr('load', [], function(args) {
   if (!fullpath)
     throw new ty.LispError('Cannot open load file: ' + filename);
 
-  let text = fs.readFileSync(fullpath, 'utf8');
+  let file = fs.readFileSync(fullpath);
+  if (fullpath.endsWith('.gz'))
+    file = zlib.gunzipSync(file);
+  let text = file.toString('utf-8');
+
   let forms = elisp.readtop(text, fullpath);
-  forms.forEach((form) => elisp.eval_lisp(form, this));
+  forms.forEach((form) => {
+    elisp.eval_lisp(form, this)
+  });
 
   return ty.t;
 }));

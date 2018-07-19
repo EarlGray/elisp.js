@@ -1,5 +1,5 @@
 {
-  "name": "elisp",
+  "name": "elisp.js",
   "version": "0.1.0",
   "description": "elisp to javascript translator",
   "main": "elisp/elisp.js",
